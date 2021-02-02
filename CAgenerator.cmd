@@ -12,11 +12,7 @@ pushd %~dp0
 ::  1.2.0   added CRL list generation
 
 :init
-<<<<<<< HEAD
 set version=1.2.0
-=======
-set version=1.1.2
->>>>>>> b6e2012e507491f75fccba55b7341cf01d644eca
 set author=lderewonko
 
 call :detect_admin_mode
