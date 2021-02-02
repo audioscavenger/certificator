@@ -13,9 +13,8 @@ set ORG=NQSALES
 :: 3650 = 10 years
 set default_days=3650
 
-:: Expert constantly predict the end of 1024bit encryption but, as of 2021 it still has not been breaked
-:: It's a guarantee you will be safe for the next 30 years when using 4096
-:: also sha512 is available
+:: Expert constantly predict the end of 1024bit encryption but, as of 2021 it still has not been breaked; using 2048 your security is improved 2^1024 times
+:: From a security perspective, sha512 it would be pretty pointless: In practical terms, SHA-256 is just as secure as SHA-384 or SHA-512. We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
 set default_md=sha256
 set default_bits=2048
 

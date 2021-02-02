@@ -10,6 +10,8 @@ pushd %~dp0
 ::  1.1.1   renamed root folder to just ORG
 ::  1.1.2   using RSA keysize from cfg only
 ::  1.2.0   added CRL list generation
+::  1.2.1   added questions to renew certificates
+::  1.2.2   switched back to 3-step KEY+CSR+CRT generation
 
 :init
 set version=1.2.0
@@ -24,6 +26,7 @@ set RESET=n
 set FORCE_CA=n
 set FORCE_CRT=y
 set DEMO=YOURDOMAIN
+set IMPORT_PFX=n
 
 
 :prechecks
@@ -43,9 +46,6 @@ IF DEFINED DEMO (
 )
 IF /I "%ORG%"=="ORG" call :error Using ORG as Organisation name is forbidden.
 
-set /P  FORCE_CA=Regenerate CA cert?     [%FORCE_CA%] 
-set /P FORCE_CRT=Regenerate Server cert? [%FORCE_CRT%] 
-
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :main
 
@@ -54,6 +54,9 @@ call :ask_for_values
 call :create_cfg openssl.ORG.cfg openssl.%ORG%.cfg
 call :reset
 call :create_folders
+
+IF EXIST %ORG%\ca.%ORG%.crt         set /P  FORCE_CA=Regenerate CA cert?     [%FORCE_CA%] 
+IF EXIST %ORG%\star.%CADOMAIN%.crt  set /P FORCE_CRT=Regenerate Server cert? [%FORCE_CRT%] 
 
 REM set OPENSSL_CONF=%~dp0openssl.%ORG%.cfg
 call :create_KEY
@@ -204,8 +207,8 @@ REM openssl ca -batch -create_serial -days 3650 -out %ORG%\ca.%ORG%.crt -keyfile
 REM openssl ca -batch -create_serial -rand_serial -subj "/CN=%ORG% CA/OU=OPS/O=%ORG%" -out %ORG%\ca.%ORG%.crt -passin pass:%CAPASS% -keyfile %ORG%\ca.%ORG%.key.crt -selfsign -extensions v3_ca -infiles %ORG%\ca.%ORG%.csr
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-openssl x509 -req -sha512 -days 3650 -extfile openssl.%ORG%.cfg -extensions nq_ca -in %ORG%\ca.%ORG%.csr -signkey %ORG%\ca.%ORG%.key.crt -out %ORG%\ca.%ORG%.crt
-REM openssl x509 -req -sha512 -days 3650 -extensions nq_ca -in %ORG%\ca.%ORG%.csr -signkey %ORG%\ca.%ORG%.key.crt -out %ORG%\ca.%ORG%.crt
+openssl x509 -req -%default_md% -days 3650 -extfile openssl.%ORG%.cfg -extensions nq_ca -in %ORG%\ca.%ORG%.csr -signkey %ORG%\ca.%ORG%.key.crt -out %ORG%\ca.%ORG%.crt
+REM openssl x509 -req -%default_md% -days 3650 -extensions nq_ca -in %ORG%\ca.%ORG%.csr -signkey %ORG%\ca.%ORG%.key.crt -out %ORG%\ca.%ORG%.crt
 IF %ERRORLEVEL% NEQ 0 pause
 
 :: verify it:
@@ -256,11 +259,10 @@ IF EXIST %ORG%\star.%CADOMAIN%.crt IF /I NOT "%FORCE_CRT%"=="y" exit /b 0
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
 :: you don't have to specify rsa keysize here, it's in the cfg already
-echo openssl req -batch -new -nodes -newkey rsa -subj "/CN=*.%CADOMAIN%" -keyout %ORG%\star.%CADOMAIN%.key.crt -out %ORG%\star.%CADOMAIN%.csr
-openssl req -batch -new -nodes -newkey rsa -subj "/CN=*.%CADOMAIN%" -keyout %ORG%\star.%CADOMAIN%.key.crt -out %ORG%\star.%CADOMAIN%.csr
+REM openssl req -batch -new -nodes -newkey rsa -subj "/CN=*.%CADOMAIN%" -keyout %ORG%\star.%CADOMAIN%.key.crt -out %ORG%\star.%CADOMAIN%.csr
 
 :: https://blog.behrang.org/articles/creating-a-ca-with-openssl.html
-REM openssl req -new -sha512 -nodes -newkey rsa -subj "/CN=*.%CADOMAIN%" -key %ORG%\star.%CADOMAIN%.key.crt -passin pass:%CAPASS% -out %ORG%\star.%CADOMAIN%.csr
+openssl req -new -%default_md% -nodes -newkey rsa -subj "/CN=*.%CADOMAIN%" -key %ORG%\star.%CADOMAIN%.key.crt -passin pass:%CAPASS% -out %ORG%\star.%CADOMAIN%.csr
 IF %ERRORLEVEL% NEQ 0 pause
 
 :: view it:
@@ -273,14 +275,14 @@ echo %c%%~0%END%
 IF EXIST %ORG%\star.%CADOMAIN%.crt IF /I NOT "%FORCE_CRT%"=="y" exit /b 0
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-openssl x509 -req -sha512 -days 3650 -CA %ORG%\ca.%ORG%.crt -CAkey %ORG%\ca.%ORG%.key.crt -CAcreateserial -CAserial %ORG%\star.%CADOMAIN%.srl -extfile openssl.%ORG%.cfg -extensions nq_server -in %ORG%\star.%CADOMAIN%.csr -out %ORG%\star.%CADOMAIN%.crt
+REM openssl x509 -req -%default_md% -days 3650 -CA %ORG%\ca.%ORG%.crt -CAkey %ORG%\ca.%ORG%.key.crt -CAcreateserial -CAserial %ORG%\star.%CADOMAIN%.srl -extfile openssl.%ORG%.cfg -extensions nq_server -in %ORG%\star.%CADOMAIN%.csr -out %ORG%\star.%CADOMAIN%.crt
 
 :: https://blog.behrang.org/articles/creating-a-ca-with-openssl.html
-REM -create_serial -rand_serial -md sha512
-REM openssl ca -create_serial -updatedb -days 3650 -passin pass:%CAPASS% -extfile openssl.%ORG%.cfg -extensions nq_server -keyfile %ORG%\ca.%ORG%.key.crt -in %ORG%\star.%CADOMAIN%.csr -out %ORG%\star.%CADOMAIN%.crt
+REM -create_serial -rand_serial -md %default_md%
+openssl ca -batch -create_serial -updatedb -days 3650 -passin pass:%CAPASS% -extfile openssl.%ORG%.cfg -extensions nq_server -keyfile %ORG%\ca.%ORG%.key.crt -in %ORG%\star.%CADOMAIN%.csr -out %ORG%\star.%CADOMAIN%.crt
 IF %ERRORLEVEL% NEQ 0 pause
 
-certutil %ORG%\star.%CADOMAIN%.crt | findstr /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do echo %c%THUMBPRINT =%END% %%t
+certutil %ORG%\star.%CADOMAIN%.crt | findstr /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do @echo %c%THUMBPRINT =%END% %%t
 
 :: view it:
 REM openssl x509 -text -noout -in %ORG%\star.%CADOMAIN%.crt
@@ -296,7 +298,8 @@ echo %c%%~0%END%
 
 :: https://blog.didierstevens.com/2013/05/08/howto-make-your-own-cert-and-revocation-list-with-openssl/
 echo:
-echo %c% openssl ca -revoke %ORG%\star.%CADOMAIN%.crt -keyfile %ORG%\ca.%ORG%.key.crt -cert %ORG%\ca.%ORG%.crt %END%
+echo To revoke the current certificate:
+echo %c%  openssl ca -revoke %ORG%\star.%CADOMAIN%.crt -keyfile %ORG%\ca.%ORG%.key.crt -cert %ORG%\ca.%ORG%.crt %END%
 REM openssl ca -revoke %ORG%\star.%CADOMAIN%.crt -keyfile %ORG%\ca.%ORG%.key.crt -cert %ORG%\ca.%ORG%.crt
 
 exit /b 0
@@ -351,8 +354,9 @@ goto :EOF
 echo %c%%~0%END%
 
 echo certutil -importPFX -f -p "%PFXPASS%" %ORG%\%CADOMAIN%.pfx
-certutil -importPFX -f -p "%PFXPASS%" %ORG%\%CADOMAIN%.pfx
-IF %ERRORLEVEL% NEQ 0 pause
+
+set /p IMPORT=Import PFX? [%IMPORT_PFX%] 
+IF /I "%IMPORT_PFX%"=="y" certutil -importPFX -f -p "%PFXPASS%" %ORG%\%CADOMAIN%.pfx || pause
 goto :EOF
 
 
