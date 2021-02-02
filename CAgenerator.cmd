@@ -7,29 +7,23 @@ pushd %~dp0
 :: CURRENT: 2-step Ca + *.domain https://adfinis.com/en/blog/openssl-x509-certificates/
 
 ::  1.1.0   separated server csr from key; can regenerate csr
+::  1.1.1   renamed root folder to just ORG
+::  1.1.2   using RSA keysize from cfg only
+::  1.2.0   added CRL list generation
 
 :init
-set version=1.1.0
+set version=1.2.0
 set author=lderewonko
 
 call :detect_admin_mode
 call :set_colors
 
 set ORG=%USERDOMAIN%
-set CADOMAIN=%USERDNSDOMAIN%
-set CAPASS=%USERDNSDOMAIN%
-set PFXPASS=%USERDNSDOMAIN%
 set PAUSE=echo:
-set RESET=
-set REMOTE=
-
-:: OPENSSL_CONF must have full path, and extension cfg on Windows. don't ask me why.
-REM set OPENSSL_CONF=%~dp0openssl.github.cfg
-REM set OPENSSL_CONF=%~dp0openssl.cfg
-REM set OPENSSL_CONF=%~dp0openssl.MIT.cfg
-REM set OPENSSL_CONF=%~dp0openssl.pki-tutorial.cfg
-set OPENSSL_CONF=%~dp0openssl.%ORG%.cfg
-REM set OPENSSL_CONF=%~dp0openssl.%ORG%.cfg
+set RESET=n
+set FORCE_CA=n
+set FORCE_CRT=y
+set DEMO=YOURDOMAIN
 
 
 :prechecks
@@ -42,17 +36,15 @@ call :check_exist_exit openssl.ORG.cmd
 
 
 :defaults
-IF DEFINED REMOTE (
-  set ORG=NQSALES
-  set CADOMAIN=INTERNAL.NQSALES.COM
-  set CAPASS=INTERNAL.NQSALES.COM
-  set PFXPASS=INTERNAL.NQSALES.COM
+IF DEFINED DEMO (
+  set ORG=%DEMO%
 ) ELSE (
   set /P ORG=Organisation? [%ORG%] 
-  set /P CADOMAIN=Domain? [%CADOMAIN%] 
-  set /P CAPASS=Key pass? [%CAPASS%] 
-  set /P PFXPASS=PFX pass? [%PFXPASS%] 
 )
+IF /I "%ORG%"=="ORG" call :error Using ORG as Organisation name is forbidden.
+
+set /P  FORCE_CA=Regenerate CA cert?     [%FORCE_CA%] 
+set /P FORCE_CRT=Regenerate Server cert? [%FORCE_CRT%] 
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :main
@@ -72,9 +64,12 @@ REM set OPENSSL_CONF=%~dp0openssl.%CADOMAIN%.cfg
 call :create_server_KEY
 call :create_server_CSR
 call :sign_server_CSR
-call :convert_CRT_PFX
-call :convert_CACRT_PFX
+call :create_CRL
+
+call :convert_chain_PFX
 call :import_chain_CRT
+
+call :revoke_CRT
 
 goto :end
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -96,27 +91,30 @@ goto :EOF
 
 :reset
 echo %c%%~0%END%
-IF DEFINED RESET rd /s /q %CADOMAIN% 2>NUL
+IF /I "%RESET%"=="y" (
+  del /f /q %ORG%\*.crt 2>NUL
+  del /f /q %ORG%\*.csr 2>NUL
+)
 goto :EOF
 
 
 :create_folders
 echo %c%%~0%END%
 
-md %CADOMAIN% 2>NUL
-REM md %CADOMAIN%\certs 2>NUL
-REM md %CADOMAIN%\crl 2>NUL
-REM md %CADOMAIN%\newcerts 2>NUL
-REM md %CADOMAIN%\private 2>NUL
-REM md %CADOMAIN%\req 2>NUL
+md %ORG%\ 2>NUL
+REM md %ORG%\certs 2>NUL
+REM md %ORG%\crl 2>NUL
+REM md %ORG%\newcerts 2>NUL
+REM md %ORG%\private 2>NUL
+REM md %ORG%\req 2>NUL
 
 :: https://serverfault.com/questions/857131/odd-error-while-using-openssl
 :: https://www.linuxquestions.org/questions/linux-security-4/why-can%27t-i-generate-a-new-certificate-with-openssl-312716/
-echo|set /p=>%CADOMAIN%\index.txt
-echo|set /p="unique_subject = no">%CADOMAIN%\index.txt.attr
+echo|set /p=>%ORG%\index.txt
+echo|set /p="unique_subject = no">%ORG%\index.txt.attr
 
 :: https://serverfault.com/questions/823679/openssl-error-while-loading-crlnumber
-echo|set /p="1000">%CADOMAIN%\crlnumber
+echo|set /p="1000">%ORG%\crlnumber
 
 goto :EOF
 
@@ -126,7 +124,7 @@ echo %c%%~0%END%
 call openssl.%ORG%.cmd
 
 :: too slow:
-copy /y openssl.ORG.cfg openssl.%ORG%.cfg
+copy /y %1 %2
 REM for /f "eol=: tokens=1,2 delims==" %%V in (openssl.ORG.cmd) DO (
   REM powershell -executionPolicy bypass -Command "(Get-Content -Path '%~2') -replace '{%%V}', '%%W' | Set-Content -Path '%~2'"
 REM )
@@ -135,6 +133,7 @@ powershell -executionPolicy bypass -Command ^(Get-Content %1^) ^| Foreach-Object
     $_ -replace '{CADOMAIN}', '%CADOMAIN%' `^
        -replace '{ORG}', '%ORG%' `^
        -replace '{default_days}', '%default_days%' `^
+       -replace '{default_md}', '%default_md%' `^
        -replace '{default_bits}', '%default_bits%' `^
        -replace '{CAPASS}', '%CAPASS%' `^
        -replace '{PFXPASS}', '%PFXPASS%' `^
@@ -150,31 +149,42 @@ powershell -executionPolicy bypass -Command ^(Get-Content %1^) ^| Foreach-Object
        -replace '{unstructuredName}', '%unstructuredName%' `^
        -replace '{CPS.1}', '%CPS.1%' `^
        -replace '{CPS.2}', '%CPS.2%' `^
-       -replace '{explicitText}', '%explicitText%'^
+       -replace '{explicitText}', '%explicitText%' `^
+       -replace '{organization}', '%organization%' `^
+       -replace '{crlDistributionPoints}', '%crlDistributionPoints%'^
     } ^| Set-Content %2
 
 :: special case for altnames:
 for /f "tokens=1,2 delims==" %%V in ('set DNS.') DO echo %%V=%%W>>%2
+for /f "tokens=1,2 delims==" %%V in ('set IP.') DO echo %%V=%%W>>%2
+
+:: OPENSSL_CONF must have full path, and extension cfg on Windows. don't ask me why.
+REM set OPENSSL_CONF=%~dp0openssl.github.cfg
+REM set OPENSSL_CONF=%~dp0openssl.cfg
+REM set OPENSSL_CONF=%~dp0openssl.MIT.cfg
+REM set OPENSSL_CONF=%~dp0openssl.pki-tutorial.cfg
+set OPENSSL_CONF=%~dp0openssl.%ORG%.cfg
+REM set OPENSSL_CONF=%~dp0openssl.%ORG%.cfg
 
 goto :EOF
 
 :create_KEY
 echo %c%%~0%END%
-IF EXIST %CADOMAIN%\ca.%ORG%.key.crt exit /b 0
+IF EXIST %ORG%\ca.%ORG%.key.crt exit /b 0
 
-REM openssl genrsa -aes256 -passout pass:%CAPASS% -out %CADOMAIN%\ca.%ORG%.key.crt
-REM openssl req -new -newkey rsa:4096 -keyout %CADOMAIN%\ca.%ORG%.key.crt -out %CADOMAIN%\ca.%ORG%.csr -passout pass:%CAPASS%
+REM openssl genrsa -aes256 -passout pass:%CAPASS% -out %ORG%\ca.%ORG%.key.crt
+REM openssl req -new -newkey rsa -keyout %ORG%\ca.%ORG%.key.crt -out %ORG%\ca.%ORG%.csr -passout pass:%CAPASS%
 
-REM openssl req -new -nodes -newkey rsa:4096 -keyout %CADOMAIN%\ca.%ORG%.key.crt -out %CADOMAIN%\ca.%ORG%.csr
-openssl req -batch -new -nodes -keyout %CADOMAIN%\ca.%ORG%.key.crt -out %CADOMAIN%\ca.%ORG%.csr
+REM openssl req -new -nodes -newkey rsa -keyout %ORG%\ca.%ORG%.key.crt -out %ORG%\ca.%ORG%.csr
+openssl req -batch -new -nodes -keyout %ORG%\ca.%ORG%.key.crt -out %ORG%\ca.%ORG%.csr
 
 :: view csr:
-echo %b%  openssl req -noout -text -in %CADOMAIN%\ca.%ORG%.csr %END%
-REM openssl req -noout -text -in %CADOMAIN%\ca.%ORG%.csr
+echo %b%  openssl req -noout -text -in %ORG%\ca.%ORG%.csr %END%
+REM openssl req -noout -text -in %ORG%\ca.%ORG%.csr
 
 :: view key:
-echo %b%  openssl rsa -noout -text -in %CADOMAIN%\ca.%ORG%.key.crt -passin pass:%CADOMAIN% %END%
-REM openssl rsa -noout -text -in %CADOMAIN%\ca.%ORG%.key.crt -passin pass:%CADOMAIN%
+echo %b%  openssl rsa -noout -text -in %ORG%\ca.%ORG%.key.crt -passin pass:%CAPASS% %END%
+REM openssl rsa -noout -text -in %ORG%\ca.%ORG%.key.crt -passin pass:%CAPASS%
 
 goto :EOF
 
@@ -187,38 +197,33 @@ goto :EOF
 
 :create_CA
 echo %c%%~0%END%
-IF EXIST %CADOMAIN%\ca.%ORG%.crt exit /b 0
-
-:: PEM has no password
-REM openssl req -x509 -new -nodes -sha512 -days 3650 -key %CADOMAIN%\ca.%ORG%.key.crt -passin pass:%CAPASS% -config %CADOMAIN%\%CADOMAIN%.cfg -out %CADOMAIN%\%CADOMAIN%.pem
-REM openssl req -x509 -new -nodes -sha512 -days 3650 -key %CADOMAIN%\ca.%ORG%.key.crt -passin pass:%CAPASS% -config %CADOMAIN%\%CADOMAIN%.cfg -out %CADOMAIN%\ca.%ORG%.crt
+IF EXIST %ORG%\ca.%ORG%.crt IF /I NOT "%FORCE_CA%"=="y" exit /b 0
 
 :: https://www.phildev.net/ssl/creating_ca.html
-REM openssl ca -batch -create_serial -days 3650 -out %CADOMAIN%\ca.%ORG%.crt -keyfile %CADOMAIN%\ca.%ORG%.key.crt -passin pass:%CAPASS% -selfsign -extensions v3_ca -infiles %CADOMAIN%\ca.%ORG%.csr
-REM openssl ca -batch -create_serial -rand_serial -subj "/CN=%ORG% CA/OU=OPS/O=%ORG%" -out %CADOMAIN%\ca.%ORG%.crt -passin pass:%CAPASS% -keyfile %CADOMAIN%\ca.%ORG%.key.crt -selfsign -extensions v3_ca -infiles %CADOMAIN%\ca.%ORG%.csr
+REM openssl ca -batch -create_serial -days 3650 -out %ORG%\ca.%ORG%.crt -keyfile %ORG%\ca.%ORG%.key.crt -passin pass:%CAPASS% -selfsign -extensions v3_ca -infiles %ORG%\ca.%ORG%.csr
+REM openssl ca -batch -create_serial -rand_serial -subj "/CN=%ORG% CA/OU=OPS/O=%ORG%" -out %ORG%\ca.%ORG%.crt -passin pass:%CAPASS% -keyfile %ORG%\ca.%ORG%.key.crt -selfsign -extensions v3_ca -infiles %ORG%\ca.%ORG%.csr
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-openssl x509 -req -sha512 -days 3650 -extfile openssl.%ORG%.cfg -extensions nq_ca -in %CADOMAIN%\ca.%ORG%.csr -signkey %CADOMAIN%\ca.%ORG%.key.crt -out %CADOMAIN%\ca.%ORG%.crt
-REM openssl x509 -req -sha512 -days 3650 -extensions nq_ca -in %CADOMAIN%\ca.%ORG%.csr -signkey %CADOMAIN%\ca.%ORG%.key.crt -out %CADOMAIN%\ca.%ORG%.crt
+openssl x509 -req -sha512 -days 3650 -extfile openssl.%ORG%.cfg -extensions nq_ca -in %ORG%\ca.%ORG%.csr -signkey %ORG%\ca.%ORG%.key.crt -out %ORG%\ca.%ORG%.crt
+REM openssl x509 -req -sha512 -days 3650 -extensions nq_ca -in %ORG%\ca.%ORG%.csr -signkey %ORG%\ca.%ORG%.key.crt -out %ORG%\ca.%ORG%.crt
 IF %ERRORLEVEL% NEQ 0 pause
 
 :: verify it:
-echo %b%  openssl x509 -text -noout -in %CADOMAIN%\ca.%ORG%.crt %END%
-REM openssl x509 -text -noout -in %CADOMAIN%\ca.%ORG%.crt
+echo %b%  openssl x509 -text -noout -in %ORG%\ca.%ORG%.crt %END%
+REM openssl x509 -text -noout -in %ORG%\ca.%ORG%.crt
 goto :EOF
 
 :convert_CA_PFX
 echo %c%%~0%END%
-IF EXIST %CADOMAIN%\ca.%ORG%.pfx exit /b 0
 
-REM openssl pkcs12 -export -name "%ORG% CA" -inkey %CADOMAIN%\ca.%ORG%.key.crt -passin pass:%CAPASS% -in %CADOMAIN%\%CADOMAIN%.pem -out %CADOMAIN%\ca.%ORG%.pfx -passout pass:%PFXPASS%
-REM openssl pkcs12 -export -name "%ORG% CA" -inkey %CADOMAIN%\ca.%ORG%.key.crt -passin pass:%CAPASS% -in %CADOMAIN%\ca.%ORG%.crt -out %CADOMAIN%\ca.%ORG%.pfx -passout pass:%PFXPASS%
+REM openssl pkcs12 -export -name "%ORG% CA" -inkey %ORG%\ca.%ORG%.key.crt -passin pass:%CAPASS% -in %ORG%\%CADOMAIN%.pem -out %ORG%\ca.%ORG%.pfx -passout pass:%PFXPASS%
+REM openssl pkcs12 -export -name "%ORG% CA" -inkey %ORG%\ca.%ORG%.key.crt -passin pass:%CAPASS% -in %ORG%\ca.%ORG%.crt -out %ORG%\ca.%ORG%.pfx -passout pass:%PFXPASS%
 
 :: https://www.phildev.net/ssl/creating_ca.html
-openssl pkcs12 -export -name "%ORG% CA" -inkey %CADOMAIN%\ca.%ORG%.key.crt -passin pass:%CAPASS% -in %CADOMAIN%\ca.%ORG%.crt -passout pass:%PFXPASS% -out %CADOMAIN%\ca.%ORG%.pfx
+openssl pkcs12 -export -name "%ORG% CA" -inkey %ORG%\ca.%ORG%.key.crt -passin pass:%CAPASS% -in %ORG%\ca.%ORG%.crt -passout pass:%PFXPASS% -out %ORG%\ca.%ORG%.pfx
 IF %ERRORLEVEL% NEQ 0 pause
 
-echo certutil -f -p %CADOMAIN% %%~dp0ca.%ORG%.pfx>%CADOMAIN%\ca.%ORG%.pfx.cmd
+echo certutil -f -p %CADOMAIN% %%~dp0ca.%ORG%.pfx>%ORG%\ca.%ORG%.pfx.cmd
 goto :EOF
 
 :import_CA
@@ -226,92 +231,127 @@ echo %c%%~0%END%
 
 :: https://medium.com/better-programming/trusted-self-signed-certificate-and-local-domains-for-testing-7c6e6e3f9548
 :: no friendly name with PEM
-REM certutil -f -addstore "Root" %CADOMAIN%\%CADOMAIN%.pem
-echo certutil -f -addstore "Root" %CADOMAIN%\ca.%ORG%.crt
-certutil -f -addstore "Root" %CADOMAIN%\ca.%ORG%.crt
+echo certutil -f -addstore "Root" %ORG%\ca.%ORG%.crt
+certutil -f -addstore "Root" %ORG%\ca.%ORG%.crt
 IF %ERRORLEVEL% NEQ 0 pause
 
 goto :EOF
 
 :create_server_KEY
 echo %c%%~0%END%
-IF EXIST %CADOMAIN%\star.%CADOMAIN%.key.crt exit /b 0
+IF EXIST %ORG%\star.%CADOMAIN%.key.crt exit /b 0
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-openssl genrsa -passout pass:%CAPASS% -out %CADOMAIN%\star.%CADOMAIN%.key.crt
+openssl genrsa -passout pass:%CAPASS% -out %ORG%\star.%CADOMAIN%.key.crt
 IF %ERRORLEVEL% NEQ 0 pause
 
 :: view it:
-echo %b%  openssl rsa -noout -text -in %CADOMAIN%\star.%CADOMAIN%.key.crt %END%
+echo %b%  openssl rsa -noout -text -in %ORG%\star.%CADOMAIN%.key.crt %END%
 
 goto :EOF
 
 :create_server_CSR
 echo %c%%~0%END%
+IF EXIST %ORG%\star.%CADOMAIN%.crt IF /I NOT "%FORCE_CRT%"=="y" exit /b 0
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-openssl req -batch -new -nodes -newkey rsa:4096 -keyout %CADOMAIN%\star.%CADOMAIN%.key.crt -out %CADOMAIN%\star.%CADOMAIN%.csr
+:: you don't have to specify rsa keysize here, it's in the cfg already
+echo openssl req -batch -new -nodes -newkey rsa -subj "/CN=*.%CADOMAIN%" -keyout %ORG%\star.%CADOMAIN%.key.crt -out %ORG%\star.%CADOMAIN%.csr
+openssl req -batch -new -nodes -newkey rsa -subj "/CN=*.%CADOMAIN%" -keyout %ORG%\star.%CADOMAIN%.key.crt -out %ORG%\star.%CADOMAIN%.csr
 
 :: https://blog.behrang.org/articles/creating-a-ca-with-openssl.html
-REM openssl req -new -sha512 -nodes -newkey rsa:4096 -subj "/CN=*.%CADOMAIN%" -key %CADOMAIN%\star.%CADOMAIN%.key.crt -passin pass:%CAPASS% -out %CADOMAIN%\star.%CADOMAIN%.csr
+REM openssl req -new -sha512 -nodes -newkey rsa -subj "/CN=*.%CADOMAIN%" -key %ORG%\star.%CADOMAIN%.key.crt -passin pass:%CAPASS% -out %ORG%\star.%CADOMAIN%.csr
 IF %ERRORLEVEL% NEQ 0 pause
 
 :: view it:
-echo %b%  openssl req -verify -in %CADOMAIN%\star.%CADOMAIN%.csr -text -noout %END%
-REM openssl req -verify -in %CADOMAIN%\star.%CADOMAIN%.csr -text -noout
+echo %b%  openssl req -verify -in %ORG%\star.%CADOMAIN%.csr -text -noout %END%
+REM openssl req -verify -in %ORG%\star.%CADOMAIN%.csr -text -noout
 goto :EOF
 
 :sign_server_CSR
 echo %c%%~0%END%
+IF EXIST %ORG%\star.%CADOMAIN%.crt IF /I NOT "%FORCE_CRT%"=="y" exit /b 0
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-openssl x509 -req -sha512 -days 3650 -CA %CADOMAIN%\ca.%ORG%.crt -CAkey %CADOMAIN%\ca.%ORG%.key.crt -CAcreateserial -CAserial %CADOMAIN%\star.%CADOMAIN%.srl -extfile openssl.%ORG%.cfg -extensions nq_server -in %CADOMAIN%\star.%CADOMAIN%.csr -out %CADOMAIN%\star.%CADOMAIN%.crt
+openssl x509 -req -sha512 -days 3650 -CA %ORG%\ca.%ORG%.crt -CAkey %ORG%\ca.%ORG%.key.crt -CAcreateserial -CAserial %ORG%\star.%CADOMAIN%.srl -extfile openssl.%ORG%.cfg -extensions nq_server -in %ORG%\star.%CADOMAIN%.csr -out %ORG%\star.%CADOMAIN%.crt
 
 :: https://blog.behrang.org/articles/creating-a-ca-with-openssl.html
 REM -create_serial -rand_serial -md sha512
-REM openssl ca -create_serial -updatedb -days 3650 -passin pass:%CAPASS% -extfile openssl.%ORG%.cfg -extensions nq_server -keyfile %CADOMAIN%\ca.%ORG%.key.crt -in %CADOMAIN%\star.%CADOMAIN%.csr -out %CADOMAIN%\star.%CADOMAIN%.crt
+REM openssl ca -create_serial -updatedb -days 3650 -passin pass:%CAPASS% -extfile openssl.%ORG%.cfg -extensions nq_server -keyfile %ORG%\ca.%ORG%.key.crt -in %ORG%\star.%CADOMAIN%.csr -out %ORG%\star.%CADOMAIN%.crt
 IF %ERRORLEVEL% NEQ 0 pause
+
+certutil %ORG%\star.%CADOMAIN%.crt | findstr /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do echo %c%THUMBPRINT =%END% %%t
 
 :: view it:
-REM openssl x509 -text -noout -in %CADOMAIN%\star.%CADOMAIN%.crt
+REM openssl x509 -text -noout -in %ORG%\star.%CADOMAIN%.crt
+
+:: verify it:
+REM certutil -verify -urlfetch %ORG%\star.%CADOMAIN%.crt
+
 goto :EOF
 
-:convert_CRT_PFX
+
+:revoke_CRT
 echo %c%%~0%END%
 
-:: https://stackoverflow.com/questions/9971464/how-to-convert-crt-cetificate-file-to-pfx
-:: just the CRT: need to install CA separately
-openssl pkcs12 -export -name "*.%CADOMAIN%" -inkey %CADOMAIN%\star.%CADOMAIN%.key.crt -passin pass:%CAPASS% -in %CADOMAIN%\star.%CADOMAIN%.crt -passout pass:%PFXPASS% -out %CADOMAIN%\star.%CADOMAIN%.pfx
-IF %ERRORLEVEL% NEQ 0 pause
+:: https://blog.didierstevens.com/2013/05/08/howto-make-your-own-cert-and-revocation-list-with-openssl/
+echo:
+echo %c% openssl ca -revoke %ORG%\star.%CADOMAIN%.crt -keyfile %ORG%\ca.%ORG%.key.crt -cert %ORG%\ca.%ORG%.crt %END%
+REM openssl ca -revoke %ORG%\star.%CADOMAIN%.crt -keyfile %ORG%\ca.%ORG%.key.crt -cert %ORG%\ca.%ORG%.crt
+
+exit /b 0
+call :create_CRL
+
 goto :EOF
 
-:convert_CACRT_PFX
+
+:create_CRL
+echo %c%%~0%END%
+
+:: https://blog.didierstevens.com/2013/05/08/howto-make-your-own-cert-and-revocation-list-with-openssl/
+openssl ca -gencrl -keyfile %ORG%\ca.%ORG%.key.crt -cert %ORG%\ca.%ORG%.crt -out %ORG%\root.crl.pem
+
+openssl crl -inform PEM -in %ORG%\root.crl.pem -outform DER -out %ORG%\root.crl
+REM del /f /q %ORG%\root.crl.pem
+
+:: verify it:
+REM certutil -verify -urlfetch %ORG%\star.%CADOMAIN%.crt
+
+:: a Windows Server 2003 CA will always check revocation on all certificates in the PKI hierarchy (except the root CA certificate) before issuing an end-entity certificate. However in this situation, a valid Certificate Revocation List (CRL) for one or more of the intermediate certification authority (CA) certificates was not be found since the root CA was offline. This issue may occur if the CRL is not available to the certificate server, or if the CRL has expired.
+
+:: You may disabled the feature that checks revocation on all certificates in the PKI hierarchy with the following command on the CA:
+
+REM certutil –setreg ca\CRLFlags +CRLF_REVCHECK_IGNORE_OFFLINE
+goto :EOF
+
+
+:convert_chain_PFX
 echo %c%%~0%END%
 
 :: https://stackoverflow.com/questions/9971464/how-to-convert-crt-cetificate-file-to-pfx
 :: CRT + CA: all in one
-REM openssl pkcs12 -export -name "*.%CADOMAIN%" -inkey %CADOMAIN%\ca.%ORG%.key.crt -passin pass:%CAPASS% -in %CADOMAIN%\star.%CADOMAIN%.crt -certfile %CADOMAIN%\ca.%ORG%.crt -passout pass:%PFXPASS% -out %CADOMAIN%\%CADOMAIN%.pfx
+REM openssl pkcs12 -export -name "*.%CADOMAIN%" -inkey %ORG%\ca.%ORG%.key.crt -passin pass:%CAPASS% -in %ORG%\star.%CADOMAIN%.crt -certfile %ORG%\ca.%ORG%.crt -passout pass:%PFXPASS% -out %ORG%\%CADOMAIN%.pfx
 
-openssl pkcs12 -export -name "*.%CADOMAIN%" -inkey %CADOMAIN%\star.%CADOMAIN%.key.crt -passin pass:%CAPASS% -in %CADOMAIN%\star.%CADOMAIN%.crt -certfile %CADOMAIN%\ca.%ORG%.crt -passout pass:%PFXPASS% -out %CADOMAIN%\%CADOMAIN%.pfx
+:: certfile and CAfile seem identical
+openssl pkcs12 -export -name "*.%CADOMAIN%" -inkey %ORG%\star.%CADOMAIN%.key.crt -passin pass:%CAPASS% -in %ORG%\star.%CADOMAIN%.crt -chain -CAfile %ORG%\ca.%ORG%.crt -passout pass:%PFXPASS% -out %ORG%\%CADOMAIN%.pfx
 IF %ERRORLEVEL% NEQ 0 pause
 
-echo certutil -importPFX -f -p %PFXPASS% %%~dp0%CADOMAIN%.pfx>%CADOMAIN%\%CADOMAIN%.pfx.cmd
+echo certutil -importPFX -f -p "%PFXPASS%" %%~dp0\%CADOMAIN%.pfx>%ORG%\%CADOMAIN%.pfx.cmd
+echo certutil -verify -urlfetch %%~dp0\star.%CADOMAIN%.crt>>%ORG%\%CADOMAIN%.pfx.cmd
+echo:>>%ORG%\%CADOMAIN%.pfx.cmd
+echo revoque IR5 certificates:>>%ORG%\%CADOMAIN%.pfx.cmd
+echo netsh http delete sslcert ipport=0.0.0.0:8085>>%ORG%\%CADOMAIN%.pfx.cmd
+echo netsh http delete sslcert ipport=0.0.0.0:8086>>%ORG%\%CADOMAIN%.pfx.cmd
+echo timeout /t 5>>%ORG%\%CADOMAIN%.pfx.cmd
 
 goto :EOF
 
-:import_crt_CRT
-echo %c%%~0%END%
-
-echo certutil -importPFX -f %CADOMAIN%\star.%CADOMAIN%.pfx
-certutil -importPFX -f %CADOMAIN%\star.%CADOMAIN%.pfx
-IF %ERRORLEVEL% NEQ 0 pause
-goto :EOF
 
 :import_chain_CRT
 echo %c%%~0%END%
 
-echo certutil -importPFX -f -p %PFXPASS% %CADOMAIN%\%CADOMAIN%.pfx
-certutil -importPFX -f -p %PFXPASS% %CADOMAIN%\%CADOMAIN%.pfx
+echo certutil -importPFX -f -p "%PFXPASS%" %ORG%\%CADOMAIN%.pfx
+certutil -importPFX -f -p "%PFXPASS%" %ORG%\%CADOMAIN%.pfx
 IF %ERRORLEVEL% NEQ 0 pause
 goto :EOF
 
