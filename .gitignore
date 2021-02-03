@@ -3,7 +3,8 @@
 *.exe
 *.txt
 .rnd
-
+*.zip
+*.7z
 
 # ---> Windows
 # Windows thumbnail cache files
