@@ -5,11 +5,12 @@
 ::                 https://cabforum.org/extended-validation/                    ::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-:: this is your FQDN domain and should be = to %USERDNSDOMAIN%
+:: this is your Root CA ORGanisation short name
+set ORG_Root=YOURORG
+:: this is your Subordinate ORGanisation short name and could be = to %USERDOMAIN%
+set ORG_Subordinate=YOURDOMAIN
+:: this is your Subscriber short name, used for filenames and could be = to %USERDNSDOMAIN%
 set CADOMAIN=INTERNAL.YOURDOMAIN.LOCAL
-
-:: this is your ORGanisation short name and could be = to %USERDOMAIN%
-set ORG=YOURDOMAIN
 
 :: website of the CA emiter:
 set authorityInfoAccessOCSP=ocsp.godaddy.com/
@@ -19,17 +20,26 @@ set authorityInfoAccessCaIssuers=certificates.godaddy.com/repository/gdig2.crt
 
 :: 3650 = 10 years
 set default_days=3650
+set default_days_Root=7300
+set default_days_Subordinate=3650
+set default_days_Subscriber=3650
 
 :: Expert constantly predict the end of 1024bit encryption but, as of 2021 it still has not been breaked; using 2048 your security is improved 2^1024 times
 :: From a security perspective, sha512 it would be pretty pointless: In practical terms, SHA-256 is just as secure as SHA-384 or SHA-512. We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
 set default_md=sha256
-set default_bits=2048
+set default_md_Root=sha512
+set default_md_Subordinate=sha256
+set default_md_Subscriber=sha256
+set default_bits_Root=4096
+set default_bits_Subordinate=2048
+set default_bits_Subscriber=1024
 
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
-set CAPASS=private_key_pass
-
-:: Password for exported PFX files, can be blank or very simple
-set PFXPASS=
+set PASSWORD_Root=private_key_pass
+set PASSWORD_Subordinate=private_key_pass
+set PASSWORD_Subscriber=private_key_pass
+:: Password for exported PFX files, can be blank or very simple; not sure it's needed
+set PASSWORD_PFX=
 
 :: req_distinguished_name section, https://en.wikipedia.org/wiki/Certificate_signing_request
 :: Only countryName MUST be 2 chars, the rest can be 64 chars max
@@ -113,8 +123,8 @@ set explicitText=This certificate protects the private data transmitted throught
 set organization=yourCompany Inc.
 
 :: X509v3 CRL Distribution Points:
-:: revocation url: you should server root.crl and root.crl.pem over http at this address:
-set crlDistributionPoints.1=http://pki.yourcompany.com/root.crl
+:: revocation url: you should serve %ORG_Subordinate%.crl (DER) and %ORG_Subordinate%.crl.crt (PEM) over http at this address:
+set crlDistributionPoints.1=http://pki.yourcompany.com/%ORG_Subordinate%.crl
 
 :: //TODO: CT Precertificate SCTs: https://certificate.transparency.dev/howctworks/
 :: //TODO: CT Precertificate SCTs: https://letsencrypt.org/2018/04/04/sct-encoding.html

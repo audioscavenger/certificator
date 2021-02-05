@@ -8,7 +8,7 @@
 set CADOMAIN=INTERNAL.NQSALES.COM
 
 :: this is your ORGanisation short name and should be = to %USERDOMAIN%
-set ORG=NQSALES
+set ORG_Root=NQSALES
 
 :: Authority Information Access: -------------------------------------------------
 :: website of the CA emiter:
@@ -25,10 +25,10 @@ set default_md=sha256
 set default_bits=2048
 
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
-set CAPASS=INTERNAL.NQSALES.COM
+set PASSWORD_Root=INTERNAL.NQSALES.COM
 
 :: Password for exported PFX files, can be blank or very simple
-set PFXPASS=INTERNAL.NQSALES.COM
+set PASSWORD_PFX=INTERNAL.NQSALES.COM
 
 :: req_distinguished_name section, https://en.wikipedia.org/wiki/Certificate_signing_request
 :: Only countryName MUST be 2 chars, the rest can be 64 chars max
