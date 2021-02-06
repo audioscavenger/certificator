@@ -7,9 +7,9 @@
 
 :: this is your Root CA ORGanisation short name
 set ORG_Root=YOURORG
-:: this is your Subordinate ORGanisation short name and could be = to %USERDOMAIN%
-set ORG_Subordinate=YOURDOMAIN
-:: this is your Subscriber short name, used for filenames and could be = to %USERDNSDOMAIN%
+:: this is your Intermediate ORGanisation short name and could be = to %USERDOMAIN%
+set ORG_Intermediate=YOURDOMAIN
+:: this is your Server short name, used for filenames and could be = to %USERDNSDOMAIN%
 set CADOMAIN=INTERNAL.YOURDOMAIN.LOCAL
 
 :: website of the CA emiter:
@@ -21,25 +21,37 @@ set authorityInfoAccessCaIssuers=certificates.godaddy.com/repository/gdig2.crt
 :: 3650 = 10 years
 set default_days=3650
 set default_days_Root=7300
-set default_days_Subordinate=3650
+set default_days_Intermediate=3650
 set default_days_Subscriber=3650
 
 :: Expert constantly predict the end of 1024bit encryption but, as of 2021 it still has not been breaked; using 2048 your security is improved 2^1024 times
 :: From a security perspective, sha512 it would be pretty pointless: In practical terms, SHA-256 is just as secure as SHA-384 or SHA-512. We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
 set default_md=sha256
 set default_md_Root=sha512
-set default_md_Subordinate=sha256
+set default_md_Intermediate=sha256
 set default_md_Subscriber=sha256
+:: https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption
+::    RSA     ECC
+::    1024    160
+::    2048    224
+::    3072    256
+::    7680    384
+::    15360   521
+set default_bits=2048
 set default_bits_Root=4096
-set default_bits_Subordinate=2048
-set default_bits_Subscriber=1024
+set default_bits_Intermediate=2048
+set default_bits_Subscriber=2048
+set default_ecc=384
+set default_ecc_Root=521
+set default_ecc_Intermediate=384
+set default_ecc_Subscriber=384
 
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
-set PASSWORD_Root=private_key_pass
-set PASSWORD_Subordinate=private_key_pass
-set PASSWORD_Subscriber=private_key_pass
+set PASSWORD_Root=root_key_pass
+set PASSWORD_Intermediate=intermediate_key_pass
+set PASSWORD_Subscriber=subscriber_key_pass
 :: Password for exported PFX files, can be blank or very simple; not sure it's needed
-set PASSWORD_PFX=
+set PASSWORD_PFX=pfx_pass
 
 :: req_distinguished_name section, https://en.wikipedia.org/wiki/Certificate_signing_request
 :: Only countryName MUST be 2 chars, the rest can be 64 chars max
@@ -83,18 +95,18 @@ set IP.3=10.1.13.95
 set IP.4=10.1.13.97
 
 
-:: Subordinate policies: OIDs of public policies that apply to your Subordinate CA ---------
+:: Intermediate policies: OIDs of public policies that apply to your Intermediate CA ---------
 :: To respect the CA Browser EV Guidelines, you must be registered in IANA under https://www.alvestrand.no/objectid/1.3.6.1.4.1.html
 :: Example: Internet Private: 1.3.6.1.4.1.44947.1.1.1 = OID attached to certificates issued by Let's Encrypt.
 :: Example: some are reserved such as 2.16.840.1.101 = gov; 2.16.840.1.113938 = EQUIFAX INC.; etc
 :: Object Identifiers (OID) are controlled by IANA and you need to register a Private Enterprise Number (PEN), or OID arc under 1.3.6.1.4.1 namespace.
 :: Here is the FREE PEN registration page: http://pen.iana.org/pen/PenApplication.page
-:: Your private namespace OID should be present in the Root CA and Subordinate CA
+:: Your private namespace OID should be present in the Root CA and Intermediate CA
 
 :: 1.Statement Identifier:  1.3.6.1.4.1.311.42.1 = Microsoft; use yours or 1.3.6.1.4.1 for internal domains
 :: 2.Certificate Type:      Domain Validation:          2.23.140.1.2.1 = domain-validated https://oidref.com/2.23.140.1.2.1
 :: 3.Certificate Type:      Organization Validation:    2.23.140.1.2.2 = subject-identity-validated  https://oidref.com/2.23.140.1.2.2
-set policiesOIDsSubordinate=1.3.6.1.4.1, 2.23.140.1.2.1, 2.23.140.1.2.2
+set policiesOIDsIntermediate=1.3.6.1.4.1, 2.23.140.1.2.1, 2.23.140.1.2.2
 
 :: End points policies: OIDs of public policies that apply to your end point / servr CA -----
 :: 1.Statement Identifier:  1.3.6.1.4.1.311.42.1 = Microsoft; use yours or 1.3.6.1.4.1 for internal domains
@@ -123,8 +135,8 @@ set explicitText=This certificate protects the private data transmitted throught
 set organization=yourCompany Inc.
 
 :: X509v3 CRL Distribution Points:
-:: revocation url: you should serve %ORG_Subordinate%.crl (DER) and %ORG_Subordinate%.crl.crt (PEM) over http at this address:
-set crlDistributionPoints.1=http://pki.yourcompany.com/%ORG_Subordinate%.crl
+:: revocation url: you should serve %ORG_Intermediate%.crl (DER) and %ORG_Intermediate%.crl.crt (PEM) over http at this address:
+set crlDistributionPoints.1=http://pki.yourcompany.com/%ORG_Intermediate%.crl
 
 :: //TODO: CT Precertificate SCTs: https://certificate.transparency.dev/howctworks/
 :: //TODO: CT Precertificate SCTs: https://letsencrypt.org/2018/04/04/sct-encoding.html
