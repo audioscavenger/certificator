@@ -5,12 +5,17 @@
 ::                 https://cabforum.org/extended-validation/                    ::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+:: RSA vs ECC is still subject of debate as of 2021.
+:: There is no denial that it's faster and exponentially more secure than rsa
+:: However some ill-developped clients still cannot handle it
+set ENCRYPTION=RSA
+
 :: this is your Root CA ORGanisation short name
 set ORG_Root=YOURORG
 :: this is your Intermediate ORGanisation short name and could be = to %USERDOMAIN%
 set ORG_Intermediate=YOURDOMAIN
 :: this is your Server short name, used for filenames and could be = to %USERDNSDOMAIN%
-set CADOMAIN=INTERNAL.YOURDOMAIN.LOCAL
+set DOMAIN=INTERNAL.YOURDOMAIN.LOCAL
 
 :: website of the CA emiter:
 set authorityInfoAccessOCSP=ocsp.godaddy.com/

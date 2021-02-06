@@ -4,8 +4,20 @@
 ::                    Some values can also be left blank.                       ::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+:: RSA vs ECC is still subject of debate as of 2021.
+:: There is no denial that it's faster and exponentially more secure than rsa
+:: However some ill-developped clients still cannot handle it
+:: https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption
+::    RSA     ECC
+::    1024    160
+::    2048    224
+::    3072    256
+::    7680    384
+::    15360   521
+set ENCRYPTION=RSA
+
 :: this is your FQDN domain and should be = to %USERDNSDOMAIN%
-set CADOMAIN=INTERNAL.YOURDOMAIN.LOCAL
+set DOMAIN=INTERNAL.YOURDOMAIN.LOCAL
 
 :: this is your ORGanisation short name and could be = to %USERDOMAIN%
 set ORG=YOURDOMAIN

@@ -44,11 +44,17 @@ openssl genrsa -aes256 -passout pass:aaaa -out dadhacks\int.DOMAIN.key 2048
 openssl req -batch -config dadhacks_intermediate.cfg -new -sha256 -passin pass:aaaa -key dadhacks\int.DOMAIN.key -out dadhacks\int.DOMAIN.csr
 openssl ca -batch -config dadhacks_root.cfg -create_serial -extensions v3_intermediate_ca -days 3650 -notext -md sha256 -passin pass:aaaa -in dadhacks\int.DOMAIN.csr -out dadhacks\int.DOMAIN.crt
 
-cat dadhacks\int.DOMAIN.crt dadhacks\ca.DOMAINNAME.crt >dadhacks\chain.DOMAINNAME.pem
-openssl pkcs12 -inkey dadhacks\int.DOMAIN.key -passin pass:aaaa -passout pass:aaaa -in dadhacks\chain.DOMAINNAME.pem -export -out dadhacks\chain.DOMAINNAME.pfx
+type dadhacks\int.DOMAIN.crt dadhacks\ca.DOMAINNAME.crt >dadhacks\DOMAINNAME.chain.pem
+openssl pkcs12 -inkey dadhacks\int.DOMAIN.key -passin pass:aaaa -passout pass:aaaa -in dadhacks\DOMAINNAME.chain.pem -export -out dadhacks\DOMAINNAME.chain.pfx
 
 
 echo -------------------------------------------------------------------------------- www
+REM 3-steps:
+openssl genrsa -aes256 -passout pass:aaaa -out dadhacks\www.example.com 2048
+openssl req -batch -config dadhacks_csr_san.cfg -new -sha256 -passin pass:aaaa -key dadhacks\int.DOMAIN.key -out dadhacks\int.DOMAIN.csr
+openssl ca -batch -config dadhacks_intermediate.cfg -create_serial -extensions v3_server_cert -days 3650 -notext -md sha256 -passin pass:aaaa -in dadhacks\int.DOMAIN.csr -out dadhacks\int.DOMAIN.crt
+
+REM 2-steps:
 openssl req -batch -passout pass:aaaa -out dadhacks\www.example.com.csr -newkey rsa:2048 -nodes -keyout dadhacks\www.example.com.key -config dadhacks_csr_san.cfg
 IF %ERRORLEVEL% NEQ 0 pause
 openssl ca -batch -config dadhacks_intermediate.cfg -extensions v3_server_cert -days 3750 -notext -md sha512 -in dadhacks\www.example.com.csr -passin pass:aaaa -out dadhacks\www.example.com.crt

@@ -31,7 +31,7 @@ REM openssl x509 -text -noout -in www.nqzw.com.crt
 ::  1.3.3   added policy_match / policy_amything fields for EV
 ::  1.3.4   added permitted_intermediate_section
 ::  1.3.5   added @crl_section
-::  1.3.6   added @alt_names_Subscriber
+::  1.3.6   added @alt_names_Server
 ::  1.3.7   added @ocsp_section
 ::  1.3.8   added working AIA: caIssuers + OCSP
 ::  1.3.9   added correct policyIdentifier
@@ -40,21 +40,19 @@ REM openssl x509 -text -noout -in www.nqzw.com.crt
 ::  1.5.1   renamed subordinate->intermediate because people
 
 :init
-set version=1.3.9
+set version=1.5.1
 set author=lderewonko
 
 call :detect_admin_mode
 call :set_colors
 
-set ORG_Root=
-set ORG_Intermediate=%USERDOMAIN%
 REM set PAUSE=echo:
 set PAUSE=pause
-set RESET=n
-set FORCE_Root=n
+set DEMO=y
+set RESET=y
+set FORCE_Root=y
 set FORCE_Intermediate=y
-set FORCE_Subscriber=y
-set DEMO=YOURORG
+set FORCE_Server=y
 set IMPORT_PFX=n
 
 
@@ -62,31 +60,44 @@ set IMPORT_PFX=n
 for %%x in (powershell.exe) do (set "powershell=%%~$PATH:x")
 IF NOT DEFINED powershell call :error %~0: powershell NOT FOUND
 
-call :check_exist_exit openssl.TEMPLATE.cfg
-call :check_exist_exit openssl.TEMPLATE.cmd
+call :check_exist_exit openssl.TEMPLATE.Root.cfg
+call :check_exist_exit openssl.TEMPLATE.intermediate.cfg
+call :check_exist_exit openssl.TEMPLATE.server.cfg
+call :check_exist_exit openssl.TEMPLATE.Root.cmd
+call :check_exist_exit openssl.TEMPLATE.intermediate.cmd
+call :check_exist_exit openssl.TEMPLATE.server.cmd
 
 
 
 :defaults
-IF DEFINED DEMO (
-  set ORG_Root=%DEMO%
-  set /P ORG_Root=Organisation? [%DEMO%] 
-) ELSE (
-  set /P        ORG_Root=Organisation? [%ORG_Root%] 
-  set /P ORG_Intermediate=Intermediate?   [%ORG_Intermediate%] 
+set ENCRYPTION=RSA
+set ORG_Root_DEMO=YOURORG
+set ORG_Intermediate_DEMO=YOURDOMAIN
+set DOMAIN_DEMO=INTERNAL.YOURDOMAIN.LOCAL
+set ORG_Root=%ORG_Root_DEMO%
+set ORG_Intermediate=%ORG_Intermediate_DEMO%
+set DOMAIN=%DOMAIN_DEMO%
+IF DEFINED DEMO goto :main
+
+set ORG_Root=
+set ORG_Intermediate=%USERDOMAIN%
+set DOMAIN=%USERDNSDOMAIN%
+set /P         ORG_Root=Organisation?  [%ORG_Root%] 
+set /P ORG_Intermediate=Intermediate?  [%ORG_Intermediate%] 
+set /P           DOMAIN=Server DOMAIN? [%DOMAIN%] 
+set /P       ENCRYPTION=ENCRYPTION?    [%ENCRYPTION%/ECC] 
 )
-IF /I "%ORG_Root%"=="ORG_Root" call :error Using ORG_Root as Organisation name is forbidden.
+IF NOT DEFINED ORG_Root         call :error Organisation is required
+IF NOT DEFINED ORG_Intermediate call :error Intermediate is required
+IF NOT DEFINED DOMAIN           call :error DOMAIN is required
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :main
-call :ask_for_values
-call :create_cfg openssl.TEMPLATE.cfg openssl.%ORG_Root%.cfg
-call :reset
+call :set_variables
 call :create_folders
-
-IF EXIST %ORG_Root%\ca.%ORG_Root%.crt         set /P       FORCE_Root=Regenerate Root cert?        [%FORCE_Root%] 
-IF EXIST %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt   set /P FORCE_Intermediate=Regenerate Intermediate cert? [%FORCE_Intermediate%] 
-IF EXIST %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt  set /P FORCE_Subscriber=Regenerate Server cert?  [%FORCE_Subscriber%] 
+call :reset
+call :init_cmd
+call :init_cfg
 
 :: https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption
 ::    RSA     ECC
@@ -99,72 +110,70 @@ IF EXIST %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt  set /P FORCE_Subscriber=R
 :: ASN1 OID: secp521r1 == NIST CURVE: P-521 = NIST/SECG curve over a 384 bit prime field
 :: prime256v1                               = X9.62/SECG curve over a 256 bit prime field
 
-REM set OPENSSL_CONF=S:\BOULOT\nQ-Documents\ConnectWiseControl\Toolbox\tools\certificator\openssl.%ORG_Root%.cfg
-set OPENSSL_CONF=%~dp0\openssl.%ORG_Root%.cfg
-REM call :create_KEY_Root_RSA
-call :create_KEY_Root_ECC
+call :create_KEY_Root_%ENCRYPTION%
 %PAUSE%
 call :create_CRT_Root
 %PAUSE%
 REM call :create_PFX_Root // this makes no sense with Intermediate CA
 
-REM set OPENSSL_CONF=%~dp0\openssl.%ORG_Intermediate%.cfg
-REM call :create_KEY_Intermediate_RSA
-call :create_KEY_Intermediate_ECC
+call :create_KEY_Intermediate_%ENCRYPTION%
 %PAUSE%
 call :create_CSR_Intermediate
 %PAUSE%
 call :create_CRT_Intermediate
 %PAUSE%
-call :create_PFX_Root_Intermediate
+call :create_PFX_IntermediateChain
+%PAUSE%
+call :create_CRL_Intermediate
 %PAUSE%
 
-REM set OPENSSL_CONF=%~dp0\openssl.%ORG_Subscriber%.cfg
-call :create_KEY_Subscriber
+call :create_KEY_Server_RSA
 %PAUSE%
-call :create_CSR_Subscriber
+call :create_CSR_Server
 %PAUSE%
-call :create_CRT_Subscriber
+call :create_CRT_Server
 %PAUSE%
-call :create_PFX_Root_Intermediate_Subscriber
+call :create_PFX_chainServer
 %PAUSE%
-call :create_CRL
+call :create_CRL_Server
 %PAUSE%
 
-call :convert_chain_PFX
-call :import_chain_CRT
-
-call :revoke_CRT
+:: //TODO: test revoking
+REM call :revoke_CRT_Intermediate
+REM call :revoke_CRT_Server
 
 goto :end
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-:ask_for_values
+
+:set_variables
 echo %c%%~0%END%
 
-IF EXIST openssl.%ORG_Root%.cmd exit /b 0
+:: we don't provide cfgCAIntermediate to the client the CAServer is for
+:: we do    provide    CAIntermediate to the client the CAServer is for so they can generate more CAServers
+set cfgCARoot=%ORG_Root%\openssl.%ORG_Root%
+set cfgCAIntermediate=%ORG_Root%\openssl.%ORG_Intermediate%
+set cfgCAServer=%ORG_Root%\%ORG_Intermediate%\openssl.%DOMAIN%
+set CARoot=%ORG_Root%\ca.%ORG_Root%
+set CAIntermediate=%ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%
+set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
 
-echo:
-echo   %HIGH%Please copy %c%openssl.ORG_Root.cmd%w% into %g%openssl.%ORG_Root%.cmd%w% and set the values inside.
-echo                            Then restart this batch%END%
-echo                                   Thank you
-echo:
-pause
-exit 0
-goto :EOF
+:: OPENSSL_CONF must have full path, and extension cfg on Windows. don't ask me why.
+:: we don't use it anymore because we need to pass config directly to each command
+REM set OPENSSL_CONF=%~dp0\openssl.github.cfg
+REM set OPENSSL_CONF=%~dp0\openssl.cfg
+REM set OPENSSL_CONF=%~dp0\openssl.MIT.cfg
+REM set OPENSSL_CONF=%~dp0\openssl.pki-tutorial.cfg
+REM set OPENSSL_CONF=%~dp0\openssl.%ORG_Root%.cfg
+REM set OPENSSL_CONF=%~dp0\openssl.%ORG_Root%.cfg
 
-
-:reset
-echo %c%%~0%END%
-IF /I "%RESET%"=="y" (
-  del /f /q /s %ORG_Root%\*.crt 2>NUL
-  del /f /q /s %ORG_Root%\*.csr 2>NUL
-)
 goto :EOF
 
 
 :create_folders
 echo %c%%~0%END%
+
+IF EXIST %ORG_Root%\%ORG_Intermediate%\ exit /b 0
 
 md %ORG_Root%\ 2>NUL
 md %ORG_Root%\%ORG_Intermediate% 2>NUL
@@ -173,22 +182,76 @@ REM md %ORG_Root%\crl 2>NUL
 REM md %ORG_Root%\newcerts 2>NUL
 REM md %ORG_Root%\private 2>NUL
 REM md %ORG_Root%\req 2>NUL
+goto :EOF
+
+
+:reset
+echo %c%%~0%END%
+
+IF /I "%RESET%"=="y" (
+  for %%e in (cfg txt key csr crt pem pfx) DO (
+    del /f /q /s %ORG_Root%\*.%%e 2>NUL
+    del /f /q /s %ORG_Root%\%ORG_Intermediate%\*.%%e 2>NUL
+  )
+  del /f /q /s %ORG_Root%\crlnumber 2>NUL
+  del /f /q /s %ORG_Root%\serial 2>NUL
+  del /f /q /s %ORG_Root%\%ORG_Intermediate%\crlnumber 2>NUL
+  del /f /q /s %ORG_Root%\%ORG_Intermediate%\serial 2>NUL
+)
+
+IF EXIST %CARoot%.crt         set /P          FORCE_Root=Regenerate Root cert?         [%FORCE_Root%] 
+IF EXIST %CAIntermediate%.crt set /P  FORCE_Intermediate=Regenerate Intermediate cert? [%FORCE_Intermediate%] 
+IF EXIST %CAServer%.crt       set /P    FORCE_Server=Regenerate Server cert?       [%FORCE_Server%] 
 
 :: https://serverfault.com/questions/857131/odd-error-while-using-openssl
 :: https://www.linuxquestions.org/questions/linux-security-4/why-can%27t-i-generate-a-new-certificate-with-openssl-312716/
-echo|set /p=>%ORG_Root%\index.txt
-echo|set /p="unique_subject = yes">%ORG_Root%\index.txt.attr
+IF NOT EXIST %ORG_Root%\index.txt echo|set /p=>%ORG_Root%\index.txt
+IF NOT EXIST %ORG_Root%\index.txt.attr echo|set /p="unique_subject = yes">%ORG_Root%\index.txt.attr
+IF NOT EXIST %ORG_Root%\%ORG_Intermediate%\index.txt echo|set /p=>%ORG_Root%\index.txt
+IF NOT EXIST %ORG_Root%\%ORG_Intermediate%\index.txt.attr echo|set /p="unique_subject = yes">%ORG_Root%\index.txt.attr
 
 :: https://serverfault.com/questions/823679/openssl-error-while-loading-crlnumber
-echo|set /p="01">%ORG_Root%\crlnumber
-echo|set /p="1000">%ORG_Root%\serial
+IF NOT EXIST %ORG_Root%\crlnumber echo|set /p="01">%ORG_Root%\crlnumber
+IF NOT EXIST %ORG_Root%\serial echo|set /p="1000">%ORG_Root%\serial
+IF NOT EXIST %ORG_Root%\%ORG_Intermediate%\crlnumber echo|set /p="01">%ORG_Root%\crlnumber
+IF NOT EXIST %ORG_Root%\%ORG_Intermediate%\serial echo|set /p="1000">%ORG_Root%\serial
 
 goto :EOF
 
-:create_cfg in out
+
+:init_cmd
 echo %c%%~0%END%
 
-call openssl.%ORG_Root%.cmd
+IF EXIST %cfgCARoot%.cmd IF EXIST %cfgCAIntermediate%.cmd IF EXIST %cfgCAServer%.cmd exit /b 0
+IF NOT EXIST %cfgCARoot%.cmd    copy openssl.TEMPLATE.Root.cmd          %cfgCARoot%.cmd
+IF NOT EXIST %cfgCARoot%.cmd    copy openssl.TEMPLATE.Intermediate.cmd  %cfgCAIntermediate%.cmd
+IF NOT EXIST %cfgCAServer%.cmd  copy openssl.TEMPLATE.Server.cmd        %cfgCAServer%.cmd
+
+echo:
+echo   %HIGH%Please edit all the %c%%ORG_Root%\*\openssl.*.cmd%w%
+echo                            Then restart this batch%END%
+echo                                   Thank you
+echo:
+pause
+exit 99
+goto :EOF
+
+
+:init_cfg
+echo %c%%~0%END%
+
+call %cfgCARoot%.cmd
+call :create_cfg openssl.TEMPLATE.Root.cfg openssl.%ORG_Root%.cfg
+call %cfgCAIntermediate%.cmd
+call :create_cfg openssl.TEMPLATE.Intermediate.cfg openssl.%ORG_Intermediate%.cfg
+call %cfgCAServer%.cmd
+call :create_cfg openssl.TEMPLATE.Server.cfg openssl.%DOMAIN%.cfg
+
+goto :EOF
+
+
+:create_cfg in out
+echo %c%%~0%END%
 
 :: too slow:
 copy /y %1 %2
@@ -197,29 +260,29 @@ REM for /f "eol=: tokens=1,2 delims==" %%V in (openssl.ORG_Root.cmd) DO (
 REM )
 
 powershell -executionPolicy bypass -Command ^(Get-Content %1^) ^| Foreach-Object { ^
-    $_ -replace '{CADOMAIN}', '%CADOMAIN%' `^
+    $_ -replace '{DOMAIN}', '%DOMAIN%' `^
        -replace '{ORG_Root}', '%ORG_Root%' `^
        -replace '{ORG_Intermediate}', '%ORG_Intermediate%' `^
-       -replace '{ORG_Subscriber}', '%ORG_Subscriber%' `^
+       -replace '{ORG_Server}', '%ORG_Server%' `^
        -replace '{default_days}', '%default_days%' `^
        -replace '{default_days_Root}', '%default_days_Root%' `^
        -replace '{default_days_Intermediate}', '%default_days_Intermediate%' `^
-       -replace '{default_days_Subscriber}', '%default_days_Subscriber%' `^
+       -replace '{default_days_Server}', '%default_days_Server%' `^
        -replace '{default_md}', '%default_md%' `^
        -replace '{default_md_Root}', '%default_md_Root%' `^
        -replace '{default_md_Intermediate}', '%default_md_Intermediate%' `^
-       -replace '{default_md_Subscriber}', '%default_md_Subscriber%' `^
+       -replace '{default_md_Server}', '%default_md_Server%' `^
        -replace '{default_bits}', '%default_bits%' `^
        -replace '{default_bits_Root}', '%default_bits_Root%' `^
        -replace '{default_bits_Intermediate}', '%default_bits_Intermediate%' `^
-       -replace '{default_bits_Subscriber}', '%default_bits_Subscriber%' `^
+       -replace '{default_bits_Server}', '%default_bits_Server%' `^
        -replace '{default_ECC}', '%default_ECC%' `^
        -replace '{default_ECC_Root}', '%default_ECC_Root%' `^
        -replace '{default_ECC_Intermediate}', '%default_ECC_Intermediate%' `^
-       -replace '{default_ECC_Subscriber}', '%default_ECC_Subscriber%' `^
+       -replace '{default_ECC_Server}', '%default_ECC_Server%' `^
        -replace '{PASSWORD_Root}', '%PASSWORD_Root%' `^
        -replace '{PASSWORD_Intermediate}', '%PASSWORD_Intermediate%' `^
-       -replace '{PASSWORD_Subscriber}', '%PASSWORD_Subscriber%' `^
+       -replace '{PASSWORD_Server}', '%PASSWORD_Server%' `^
        -replace '{PASSWORD_PFX}', '%PASSWORD_PFX%' `^
        -replace '{countryName}', '%countryName%' `^
        -replace '{stateOrProvinceName}', '%stateOrProvinceName%' `^
@@ -250,14 +313,6 @@ powershell -executionPolicy bypass -Command ^(Get-Content %1^) ^| Foreach-Object
 for /f "tokens=1,2 delims==" %%V in ('set DNS.') DO echo %%V=%%W>>%2
 for /f "tokens=1,2 delims==" %%V in ('set IP.') DO echo %%V=%%W>>%2
 
-:: OPENSSL_CONF must have full path, and extension cfg on Windows. don't ask me why.
-REM set OPENSSL_CONF=%~dp0\openssl.github.cfg
-REM set OPENSSL_CONF=%~dp0\openssl.cfg
-REM set OPENSSL_CONF=%~dp0\openssl.MIT.cfg
-REM set OPENSSL_CONF=%~dp0\openssl.pki-tutorial.cfg
-REM set OPENSSL_CONF=%~dp0\openssl.%ORG_Root%.cfg
-REM set OPENSSL_CONF=%~dp0\openssl.%ORG_Root%.cfg
-
 goto :EOF
 
 :O---------O
@@ -267,48 +322,48 @@ goto :EOF
 :create_KEY_Root_RSA
 echo %c%%~0%END%
 :: view it:
-echo %HIGH%%b%  openssl rsa -noout -text -in %ORG_Root%\ca.%ORG_Root%.key -passin pass:%PASSWORD_Root% %END%
+echo %HIGH%%b%  openssl rsa -batch -config %cfgCARoot%.cfg -noout -text -passin pass:%PASSWORD_Root% -in %CARoot%.key %END%
 
-IF EXIST %ORG_Root%\ca.%ORG_Root%.key exit /b 0
+IF EXIST %CARoot%.key exit /b 0
 
-:: options 1:
+:: 2-steps:
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-REM openssl genrsa -aes-256-cbc -passout pass:%PASSWORD_Root% -out %ORG_Root%\ca.%ORG_Root%.key
+REM openssl genrsa -batch -config %cfgCARoot% -aes-256-cbc -passout pass:%PASSWORD_Root% -out %CARoot%.key
 :: deprecation: https://serverfault.com/questions/590140/openssl-genrsa-vs-genpkey
-REM openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:%default_bits_Root% -out %ORG_Root%\ca.%ORG_Root%.key -aes-256-cbc -pass pass:%PASSWORD_Root%
+openssl genpkey -batch -config %cfgCARoot% -algorithm RSA -pkeyopt rsa_keygen_bits:%default_bits_Root% -pass pass:%PASSWORD_Root% -out %CARoot%.key -aes-256-cbc
 
-:: options 2:
-openssl req -batch -new -nodes -keyout %ORG_Root%\ca.%ORG_Root%.key -out %ORG_Root%\ca.%ORG_Root%.csr
+:: 1-step:
+REM openssl req -batch -config %cfgCARoot%.cfg -new -nodes -keyout %CARoot%.key -passout pass:%PASSWORD_Root% -out %CARoot%.csr
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
 :: view it:
-REM openssl rsa -noout -text -in %ORG_Root%\ca.%ORG_Root%.key -passin pass:%PASSWORD_Root%
+REM openssl rsa -noout -text -in %CARoot%.key -passin pass:%PASSWORD_Root%
 goto :EOF
 
 
 :create_KEY_Root_ECC
 echo %c%%~0%END%
 :: view it:
-echo %HIGH%%b%  openssl ec -noout -text -in %ORG_Root%\ca.%ORG_Root%.key -passin pass:%PASSWORD_Root% %END%
+echo %HIGH%%b%  openssl ec -noout -text -passin pass:%PASSWORD_Root% -in %CARoot%.key %END%
 
-IF EXIST %ORG_Root%\ca.%ORG_Root%.key exit /b 0
+IF EXIST %CARoot%.key exit /b 0
 
 :: https://www.ibm.com/support/knowledgecenter/en/SSB27H_6.2.0/fa2ti_openssl_using_ECCdhersa_generate_ECC_key.html
 :: https://stackoverflow.com/questions/64961096/what-is-the-suggested-openssl-command-to-generate-ec-key-and-csr-compatible-with
 :: https://www.openssl.org/docs/man1.1.0/man1/genpkey.html
 :: options 1: why you need to store the params: https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations
-REM openssl ecparam -out %ORG_Root%\ca.%ORG_Root%.param.crt -name secp%default_ECC_Root%r1 -param_enc explicit
-REM openssl genpkey -paramfile %ORG_Root%\ca.%ORG_Root%.param.crt -out %ORG_Root%\ca.%ORG_Root%.key -pass pass:%PASSWORD_Root%
+openssl ecparam -batch -config %cfgCARoot% -out %CARoot%.param.crt -name secp%default_ECC_Root%r1 -param_enc explicit
+openssl genpkey -batch -config %cfgCARoot% -paramfile %CARoot%.param.crt -pass pass:%PASSWORD_Root% -out %CARoot%.key
 
 :: options 1b:
-REM openssl genpkey -algorithm EC -out %ORG_Root%\ca.%ORG_Root%.key -pkeyopt ec_paramgen_curve:P-%default_ECC_Root% -pkeyopt ec_param_enc:named_curve
+REM openssl genpkey -batch -config %cfgCARoot% -algorithm EC -out %CARoot%.key -pkeyopt ec_paramgen_curve:P-%default_ECC_Root% -pkeyopt ec_param_enc:named_curve
 
 :: options 2:
-openssl x509 -req -%default_md% -days %default_days_Root% -extensions v3_ca -in %ORG_Root%\ca.%ORG_Root%.csr -signkey %ORG_Root%\ca.%ORG_Root%.key -out %ORG_Root%\ca.%ORG_Root%.crt
+REM openssl x509 -batch -config %cfgCARoot% -req -%default_md% -days %default_days_Root% -extensions v3_ca -in %CARoot%.csr -signkey %CARoot%.key -passout pass:%PASSWORD_Root% -out %CARoot%.crt
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
 :: view it:
-REM openssl ec -noout -text -in %ORG_Root%\ca.%ORG_Root%.key -passin pass:%PASSWORD_Root%
+REM openssl ec -noout -text -passin pass:%PASSWORD_Root% -in %CARoot%.key
 goto :EOF
 
 
@@ -321,50 +376,39 @@ goto :EOF
 :create_CRT_Root
 echo %c%%~0%END%
 :: view it:
-echo %HIGH%%b%  openssl x509 -text -noout -in %ORG_Root%\ca.%ORG_Root%.crt %END%
+echo %HIGH%%b%  openssl x509 -text -noout -in %CARoot%.crt %END%
 
 :: verify it:
-echo %HIGH%%b%  certutil -verify -urlfetch %ORG_Root%\ca.%ORG_Root%.crt %END%
+echo %HIGH%%b%  certutil -verify -urlfetch %CARoot%.crt %END%
 
-IF EXIST %ORG_Root%\ca.%ORG_Root%.crt IF /I NOT "%FORCE_Root%"=="y" exit /b 0
+IF EXIST %CARoot%.crt IF /I NOT "%FORCE_Root%"=="y" exit /b 0
 
-REM v3_ca v3_ca
-REM M$ and gg have same group but M$ also has country -subj "/CN=%ORG_Root% Root/OU=%ORG_Root% CA/O=%ORG_Root%"
-openssl req -batch -new -x509 -%default_md_Intermediate% -days %default_days_Root% -subj "/CN=%ORG_Root% Root/OU=%ORG_Root% CA/O=%ORG_Root%" -passin pass:%PASSWORD_Root% -extensions v3_ca -key %ORG_Root%\ca.%ORG_Root%.key -out %ORG_Root%\ca.%ORG_Root%.crt
+REM -subj: M$ and gg have same group but M$ also has country -subj "/CN=%ORG_Root% Root/OU=%ORG_Root% CA/O=%ORG_Root%"
+openssl req -batch -config %cfgCARoot% -new -x509 -%default_md_Root% -passin pass:%PASSWORD_Root% -extensions v3_ca -key %CARoot%.key -out %CARoot%.crt
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
-certutil -dump %ORG_Root%\ca.%ORG_Root%.crt | findstr /b /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do @echo %c%THUMBPRINT =%END% %%t
+certutil -dump %CARoot%.crt | findstr /b /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do @echo %c%THUMBPRINT =%END% %%t
 
 :: view it:
-openssl x509 -text -noout -in %ORG_Root%\ca.%ORG_Root%.crt
+openssl x509 -text -noout -in %CARoot%.crt
 
 :: verify it:
-REM certutil -verify -urlfetch %ORG_Root%\ca.%ORG_Root%.crt
+REM certutil -verify -urlfetch %CARoot%.crt
 
 goto :EOF
 
-:create_PFX_Root
-echo %c%%~0%END%
-
-:: https://www.phildev.net/ssl/creating_ca.html
-openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %ORG_Root%\ca.%ORG_Root%.key -passin pass:%PASSWORD_Root% -in %ORG_Root%\ca.%ORG_Root%.crt -passout pass:%PASSWORD_PFX% -out %ORG_Root%\ca.%ORG_Root%.pfx
-IF %ERRORLEVEL% NEQ 0 pause & exit 1
-
-echo %b% certutil -f -p %PASSWORD_PFX% %%~dp0\ca.%ORG_Root%.pfx %END%
-echo certutil -f -p %PASSWORD_PFX% %%~dp0\ca.%ORG_Root%.pfx >%ORG_Root%\ca.%ORG_Root%.pfx.cmd
-
-goto :EOF
 
 :import_CRT_Root_PEM
 echo %c%%~0%END%
 
 :: https://medium.com/better-programming/trusted-self-signed-certificate-and-local-domains-for-testing-7c6e6e3f9548
 :: no friendly name with PEM
-echo certutil -f -addstore "Root" %ORG_Root%\ca.%ORG_Root%.crt
-certutil -f -addstore "Root" %ORG_Root%\ca.%ORG_Root%.crt
+echo certutil -f -addstore "Root" %CARoot%.crt
+certutil -f -addstore "Root" %CARoot%.crt
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
 goto :EOF
+
 
 :O---------O
 :Intermediate
@@ -373,72 +417,78 @@ goto :EOF
 :create_KEY_Intermediate_RSA
 echo %c%%~0%END%
 :: view it:
-echo %HIGH%%b%  openssl rsa -noout -text -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key %END%
+echo %HIGH%%b%  openssl rsa -noout -text -in %CAIntermediate%.key %END%
 
-IF EXIST %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key exit /b 0
+IF EXIST %CAIntermediate%.key exit /b 0
 
+:: 2-steps:
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-openssl genrsa -passout pass:%PASSWORD_Intermediate% -out %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key
+REM openssl genrsa -batch -config %cfgCAIntermediate%.cfg -passout pass:%PASSWORD_Intermediate% -out %CAIntermediate%.key
+:: deprecation: https://serverfault.com/questions/590140/openssl-genrsa-vs-genpkey
+openssl genpkey -batch -config %cfgCAIntermediate%.cfg -algorithm RSA -pkeyopt rsa_keygen_bits:%default_bits_Intermediate% -pass pass:%PASSWORD_Intermediate% -out %CAIntermediate%.key -aes-256-cbc
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
 :: view it:
-REM openssl rsa -noout -text -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key
+REM openssl rsa -noout -text -in %CAIntermediate%.key
 goto :EOF
+
 
 :create_KEY_Intermediate_ECC
 echo %c%%~0%END%
 :: view it:
-echo %HIGH%%b%  openssl ec -noout -text -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key -passin pass:%PASSWORD_Intermediate% %END%
+echo %HIGH%%b%  openssl ec -noout -text -passin pass:%PASSWORD_Intermediate% -in %CAIntermediate%.key %END%
 
-IF EXIST %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key exit /b 0
+IF EXIST %CAIntermediate%.key exit /b 0
 
 :: https://www.ibm.com/support/knowledgecenter/en/SSB27H_6.2.0/fa2ti_openssl_using_ECCdhersa_generate_ECC_key.html
 :: https://stackoverflow.com/questions/64961096/what-is-the-suggested-openssl-command-to-generate-ec-key-and-csr-compatible-with
 :: https://www.openssl.org/docs/man1.1.0/man1/genpkey.html
 :: options 1: why you need to store the params: https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations
-openssl ecparam -out %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.param.crt -name secp%default_ECC_Intermediate%r1
-openssl genpkey -paramfile %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.param.crt -out %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key -pass pass:%PASSWORD_Intermediate%
+openssl ecparam -batch -config %cfgCAIntermediate%.cfg -out %CAIntermediate%.param.crt -name secp%default_ECC_Intermediate%r1
+openssl genpkey -batch -config %cfgCAIntermediate%.cfg -paramfile %CAIntermediate%.param.crt -pass pass:%PASSWORD_Intermediate% -out %CAIntermediate%.key
 
 :: options 2:
-REM openssl genpkey -algorithm EC -out %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key -pkeyopt ec_paramgen_curve:P-%default_ECC_Intermediate% -pkeyopt ec_param_enc:named_curve
+REM openssl genpkey -batch -config %cfgCAIntermediate%.cfg -algorithm EC -out %CAIntermediate%.key -pkeyopt ec_paramgen_curve:P-%default_ECC_Intermediate% -pkeyopt ec_param_enc:named_curve
 
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
 :: view it:
-REM openssl ec -noout -text -in %ORG_Root%\ca.%ORG_Root%.key -passin pass:%PASSWORD_Root%
+REM openssl ec -noout -text -passin pass:%PASSWORD_Intermediate% -in %CAIntermediate%.key
 goto :EOF
+
 
 :create_CSR_Intermediate
 echo %c%%~0%END%
 :: verify it:
-echo %HIGH%%b%  openssl req -verify -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.csr -text -noout %END%
+echo %HIGH%%b%  openssl req -verify -in %CAIntermediate%.csr -text -noout %END%
 
-IF EXIST %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt IF /I NOT "%FORCE_Intermediate%"=="y" exit /b 0
+IF EXIST %CAIntermediate%.crt IF /I NOT "%FORCE_Intermediate%"=="y" exit /b 0
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
 :: you don't have to specify rsa keysize here, it's using the private key size
 REM -newkey rsa:%default_bits_Intermediate%
 :: https://blog.behrang.org/articles/creating-a-ca-with-openssl.html
 REM M$ and gg both have same group -subj "/CN=%ORG_Intermediate% Root/O=%ORG_Root%/C=%countryName%"
-openssl req -new -%default_md_Intermediate% -nodes -subj "/CN=%ORG_Intermediate% RSA TLS CA/O=%ORG_Root%/C=%countryName%" -key %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key -passin pass:%PASSWORD_Intermediate% -out %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.csr
+openssl req -batch -config %cfgCAIntermediate%.cfg -new -nodes -key %CAIntermediate%.key -passin pass:%PASSWORD_Intermediate% -out %CAIntermediate%.csr
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
 :: verify it:
-REM openssl req -verify -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.csr -text -noout
+REM openssl req -verify -in %CAIntermediate%.csr -text -noout
 goto :EOF
+
 
 :create_CRT_Intermediate
 echo %c%%~0%END%
 :: view it:
-echo %HIGH%%b%  openssl x509 -text -noout -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt %END%
+echo %HIGH%%b%  openssl x509 -text -noout -in %CAIntermediate%.crt %END%
 
 :: verify it:
-echo %HIGH%%b%  certutil -verify -urlfetch %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt %END%
+echo %HIGH%%b%  certutil -verify -urlfetch %CAIntermediate%.crt %END%
 
-IF EXIST %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt IF /I NOT "%FORCE_Intermediate%"=="y" exit /b 0
+IF EXIST %CAIntermediate%.crt IF /I NOT "%FORCE_Intermediate%"=="y" exit /b 0
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-REM openssl x509 -req -%default_md_Intermediate% -days %default_days_Intermediate% -CA %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Root%.crt -CAkey %ORG_Root%\ca.%ORG_Root%.key -CAcreateserial -CAserial %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.srl -extfile openssl.%ORG_Root%.cfg -extensions v3_intermediate_ca -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.csr -out %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt
+REM openssl x509 -req -%default_md_Intermediate% -days %default_days_Intermediate% -CA %CARoot%.crt -CAkey %CARoot%.key -CAcreateserial -CAserial %CAIntermediate%.srl -extfile openssl.%ORG_Root%.cfg -extensions v3_intermediate_ca -in %CAIntermediate%.csr -out %CAIntermediate%.crt
 
 :: https://blog.behrang.org/articles/creating-a-ca-with-openssl.html
 REM -startdate val          Cert notBefore, YYMMDDHHMMSSZ
@@ -448,113 +498,223 @@ REM -rand_serial            will generate serialNumber everytime and not store i
 REM -md %default_md_Intermediate%        sha256 sha512
 REM -extfile openssl.%ORG_Root%.cfg
 REM -updatedb
+REM -notext
 REM echo|set /p=>%ORG_Root%\index.txt
-openssl ca -batch -create_serial -days %default_days_Intermediate% -passin pass:%PASSWORD_Root% -extfile openssl.%ORG_Root%.cfg -extensions v3_intermediate_ca -keyfile %ORG_Root%\ca.%ORG_Root%.key -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.csr -out %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt
-openssl ca -batch -create_serial -days %default_days_Intermediate% -passin pass:%PASSWORD_Root% -extensions v3_intermediate_ca -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.csr -out %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt
-openssl ca -batch -create_serial -days %default_days_Intermediate% -passin pass:%PASSWORD_Root% -extfile openssl.%ORG_Root%.cfg -extensions v3_intermediate_ca -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.csr -out %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt
+:: WARNING using cfgCARoot to sign the Intermediate CSR is indeed correct!
+:: That is why we cannot let the client regenerate the CAIntermediate themselves: they would need the CARoot password
+openssl ca -batch -config %cfgCARoot% -create_serial -passin pass:%PASSWORD_Root% -extensions v3_intermediate_ca -in %CAIntermediate%.csr -out %CAIntermediate%.crt
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
-certutil -dump %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt | findstr /b /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do @echo %c%THUMBPRINT =%END% %%t
+certutil -dump %CAIntermediate%.crt | findstr /b /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do @echo %c%THUMBPRINT =%END% %%t
 
 :: view it:
-REM openssl x509 -text -noout -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt
+REM openssl x509 -text -noout -in %CAIntermediate%.crt
 
 :: verify it:
-REM certutil -verify -urlfetch %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt
-REM openssl verify -CAfile %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Root%.crt %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt
+REM certutil -verify -urlfetch %CAIntermediate%.crt
+REM openssl verify -CAfile %CARoot%.crt %CAIntermediate%.crt
 
 goto :EOF
 
-:create_PFX_Root_Intermediate
+
+:create_PFX_IntermediateChain
 echo %c%%~0%END%
 
+:: create chain pem for Apache/nginx:
+type %CAIntermediate%.crt %CARoot%.crt >%CAIntermediate%.chain.pem
+
+:: convert chain to PFX for Windows:
+openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %CAIntermediate%.key -passin pass:%PASSWORD_Intermediate% -in %CAIntermediate%.chain.pem -passout pass:aaaa -out %CAIntermediate%.chain.pfx
+
 :: https://www.phildev.net/ssl/creating_ca.html
-openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key -passin pass:%PASSWORD_Intermediate% -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt -chain -CAfile %ORG_Root%\ca.%ORG_Root%.crt -passout pass:%PASSWORD_PFX% -out %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.pfx
+REM openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %CAIntermediate%.key -passin pass:%PASSWORD_Intermediate% -in %CAIntermediate%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX% -out %CAIntermediate%.pfx
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
-echo %b% certutil -importPFX -f -p %PASSWORD_PFX% %%~dp0\%ORG_Intermediate%\ca.%ORG_Intermediate%.pfx %END%
-echo certutil -importPFX -f -p %PASSWORD_PFX% %%~dp0\%ORG_Intermediate%\ca.%ORG_Intermediate%.pfx >%ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.pfx.cmd
+echo %b% certutil -importPFX -f -p %PASSWORD_PFX% %CAIntermediate%.pfx %END%
+echo certutil -importPFX -f -p %PASSWORD_PFX% %CAIntermediate%.pfx >%CAIntermediate%.pfx.cmd
 
 goto :EOF
 
+
+:create_CRL_Intermediate
+echo %c%%~0%END%
+
+:: verify it:
+echo %HIGH%%b%  certutil -verify -urlfetch %CAIntermediate%.crt %END%
+
+:: https://blog.didierstevens.com/2013/05/08/howto-make-your-own-cert-and-revocation-list-with-openssl/
+:: Generate an empty CRL (both in PEM and DER):
+openssl ca -batch -config %cfgCAIntermediate%.cfg -gencrl -keyfile %CAIntermediate%.key -cert %CAIntermediate%.crt -out %CAIntermediate%.crl.crt
+openssl crl -batch -config %cfgCAIntermediate%.cfg -inform PEM -in %CAIntermediate%.crl.crt -outform DER -out %CAIntermediate%.crl
+
+:: verify it:
+echo %HIGH%%b%  certutil -verify -urlfetch %CAIntermediate%.crt %END%
+:: verify it:
+REM certutil -verify -urlfetch %CAIntermediate%.crt
+
+:: a Windows Server 2003 CA will always check revocation on all certificates in the PKI hierarchy (except the root CA certificate) before issuing an end-entity certificate. However in this situation, a valid Certificate Revocation List (CRL) for one or more of the intermediate certification authority (CA) certificates was not be found since the root CA was offline. This issue may occur if the CRL is not available to the certificate server, or if the CRL has expired.
+:: You may disabled the feature that checks revocation on all certificates in the PKI hierarchy with the following command on the CA:
+
+REM certutil –setreg ca\CRLFlags +CRLF_REVCHECK_IGNORE_OFFLINE
+goto :EOF
 
 
 :O---------O
 :Server
 :O---------O
 
-:create_KEY_Subscriber
+:create_KEY_Server_RSA
 echo %c%%~0%END%
 :: view it:
-echo %HIGH%%b%  openssl rsa -noout -text -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.key %END%
+echo %HIGH%%b%  openssl rsa -batch -noout -text -in %CAServer%.key %END%
 
-IF EXIST %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.key exit /b 0
+IF EXIST %CAServer%.key exit /b 0
 
+:: 2-steps:
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-REM openssl genrsa -passout pass:%PASSWORD_Subscriber% -out %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.key
+REM openssl genrsa -batch -config %cfgCAServer%.cfg -passout pass:%PASSWORD_Intermediate% -out %CAServer%.key
+:: deprecation: https://serverfault.com/questions/590140/openssl-genrsa-vs-genpkey
+openssl genpkey -batch -config %cfgCAServer%.cfg -algorithm RSA -pkeyopt rsa_keygen_bits:%default_bits_Root% -pass pass:%PASSWORD_Server% -out %CAServer%.key -aes-256-cbc
 
-::http://dadhacks.org/2017/12/27/building-a-root-ca-and-an-intermediate-ca-using-openssl-and-debian-stretch/
-openssl req -out %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.csr -newkey rsa:%default_bits_Subscriber% -subj "/CN=*.%CADOMAIN%/O=%organizationName%/OU=%ORG_Intermediate%/L=%localityName%/ST=%stateOrProvinceName%/C=%countryName%" -nodes -passout pass:%PASSWORD_Subscriber% -keyout %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.key
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
 :: view it:
-REM openssl rsa -noout -text -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.key
+REM openssl rsa -noout -text -in %CAServer%.key
 goto :EOF
 
-:create_CSR_Subscriber
+
+:create_KEY_Server_ECC
+echo %c%%~0%END%
+:: view it:
+echo %HIGH%%b%  openssl ec -noout -text -passin pass:%PASSWORD_Server% -in %CAServer%.key %END%
+
+IF EXIST %CAServer%.key exit /b 0
+
+:: https://www.ibm.com/support/knowledgecenter/en/SSB27H_6.2.0/fa2ti_openssl_using_ECCdhersa_generate_ECC_key.html
+:: https://stackoverflow.com/questions/64961096/what-is-the-suggested-openssl-command-to-generate-ec-key-and-csr-compatible-with
+:: https://www.openssl.org/docs/man1.1.0/man1/genpkey.html
+:: options 1: why you need to store the params: https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations
+openssl ecparam -batch -config %cfgCAServer%.cfg -out %CAServer%.param.crt -name secp%default_ECC_Server%r1
+openssl genpkey -batch -config %cfgCAServer%.cfg -paramfile %CAServer%.param.crt -pass pass:%PASSWORD_Server% -out %CAServer%.key
+
+:: options 2:
+REM openssl genpkey -batch -config %cfgCAServer%.cfg -algorithm EC -out %CAServer%.key -pkeyopt ec_paramgen_curve:P-%default_ECC_Intermediate% -pkeyopt ec_param_enc:named_curve
+
+IF %ERRORLEVEL% NEQ 0 pause & exit 1
+
+:: view it:
+REM openssl ec -noout -text -passin pass:%PASSWORD_Server% -in %CAServer%.key
+goto :EOF
+
+
+:create_CSR_Server
 echo %c%%~0%END%
 :: verify it:
-echo %HIGH%%b%  openssl req -verify -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.csr -text -noout %END%
+echo %HIGH%%b%  openssl req -verify -in %CAServer%.csr -text -noout %END%
 
-IF EXIST %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt IF /I NOT "%FORCE_Subscriber%"=="y" exit /b 0
+IF EXIST %CAServer%.crt IF /I NOT "%FORCE_Server%"=="y" exit /b 0
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
+:: you don't have to specify rsa keysize here, it's using the private key size
+REM -newkey rsa:%default_bits_Server%
 :: https://blog.behrang.org/articles/creating-a-ca-with-openssl.html
-REM openssl req -new -%default_md_Subscriber% -newkey rsa:%default_bits_Subscriber% -nodes -subj "/CN=*.%CADOMAIN%/O=%organizationName%/OU=%ORG_Intermediate%/L=%localityName%/ST=%stateOrProvinceName%/C=%countryName%" -key %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.key -passin pass:%PASSWORD_Subscriber% -out %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.csr
-
-:: http://dadhacks.org/2017/12/27/building-a-root-ca-and-an-intermediate-ca-using-openssl-and-debian-stretch/
-openssl ca -batch -extensions v3_server_cert -days %default_days_Subscriber% -md %default_md_Subscriber% -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.csr -out %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt
+REM M$ and gg both have same group -subj "/CN=%ORG_Server% Root/O=%ORG_Root%/C=%countryName%"
+openssl req -batch -config %cfgCAServer%.cfg -new -nodes -key %CAServer%.key -passin pass:%PASSWORD_Server% -out %CAServer%.csr
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
 :: verify it:
-REM openssl req -verify -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.csr -text -noout
+REM openssl req -verify -in %CAServer%.csr -text -noout
 goto :EOF
 
-:create_CRT_Subscriber
+
+:create_CRT_Server
 echo %c%%~0%END%
 :: view it:
-echo %HIGH%%b%  openssl x509 -text -noout -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt %END%
+echo %HIGH%%b%  openssl x509 -text -noout -in %CAServer%.crt %END%
 
 :: verify it:
-echo %HIGH%%b%  certutil -verify -urlfetch %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt %END%
-echo %HIGH%%b%  openssl verify -CAfile %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt %END%
+echo %HIGH%%b%  certutil -verify -urlfetch %CAServer%.crt %END%
 
-IF EXIST %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt IF /I NOT "%FORCE_Subscriber%"=="y" exit /b 0
+IF EXIST %CAServer%.crt IF /I NOT "%FORCE_Server%"=="y" exit /b 0
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
-REM openssl x509 -req -%default_md_Subscriber% -days %default_days_Subscriber% -CA %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Root%.crt -CAkey %ORG_Root%\ca.%ORG_Root%.key -CAcreateserial -CAserial %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.srl -extfile openssl.%ORG_Root%.cfg -extensions v3_server_cert -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.csr -out %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt
+REM openssl x509 -req -%default_md_Server% -days %default_days_Server% -CA %CARoot%.crt -CAkey %CARoot%.key -CAcreateserial -CAserial %CAServer%.srl -extfile openssl.%ORG_Root%.cfg -extensions v3_Server_ca -in %CAServer%.csr -out %CAServer%.crt
 
 :: https://blog.behrang.org/articles/creating-a-ca-with-openssl.html
 REM -startdate val          Cert notBefore, YYMMDDHHMMSSZ
 REM -enddate val            YYMMDDHHMMSSZ cert notAfter (overrides -days)
 REM -create_serial          will generate serialNumber into serialNumber.pem
 REM -rand_serial            will generate serialNumber everytime and not store it, but actually it does
-REM -md %default_md_Subscriber%        sha256 sha512
-REM -keyfile %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key 
+REM -md %default_md_Server%        sha256 sha512
+REM -extfile openssl.%ORG_Root%.cfg
+REM -updatedb
+REM -notext
 REM echo|set /p=>%ORG_Root%\index.txt
-REM openssl ca -batch -create_serial -updatedb -days %default_days_Subscriber% -passin pass:%PASSWORD_Intermediate% -extfile openssl.%ORG_Root%.cfg -extensions v3_server_cert -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.csr -out %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt
-openssl ca -batch -create_serial -days %default_days_Subscriber% -md %default_md_Subscriber% -extfile openssl.%ORG_Root%.cfg -extensions v3_server_cert -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.csr -out %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt
+:: WARNING using cfgCAIntermediate to sign the Server CSR is indeed correct!
+:: That is why we cannot let the client regenerate the CAServer themselves: they would need the CARoot password
+openssl ca -batch -config %cfgCAIntermediate% -create_serial -passin pass:%PASSWORD_Intermediate% -extensions v3_Server_ca -in %CAServer%.csr -out %CAServer%.crt
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
-certutil -dump %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt | findstr /b /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do @echo %c%THUMBPRINT =%END% %%t
+certutil -dump %CAServer%.crt | findstr /b /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do @echo %c%THUMBPRINT =%END% %%t
 
 :: view it:
-REM openssl x509 -text -noout -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt
+REM openssl x509 -text -noout -in %CAServer%.crt
 
 :: verify it:
-REM certutil -verify -urlfetch %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt
-REM openssl verify -CAfile %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt
+REM certutil -verify -urlfetch %CAServer%.crt
+REM openssl verify -CAfile %CARoot%.crt %CAServer%.crt
 
+goto :EOF
+
+
+:create_PFX_ServerChain
+echo %c%%~0%END%
+
+:: create chain pem for Apache/nginx:
+type %CAServer%.crt %CAIntermediate%.crt %CARoot%.crt >%CAServer%.chain.pem
+
+:: convert chain to PFX for Windows:
+openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PASSWORD_Server% -in %CAServer%.chain.pem -passout pass:aaaa -out %CAServer%.chain.pfx
+
+:: https://stackoverflow.com/questions/9971464/how-to-convert-crt-cetificate-file-to-pfx
+:: CRT + CA: all in one
+REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CARoot%.key -passin pass:%PASSWORD_Root% -in %CAServer%.crt -certfile %CARoot%.crt -passout pass:%PASSWORD_PFX% -out %CAServer%.pfx
+
+:: https://www.phildev.net/ssl/creating_ca.html
+REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PASSWORD_Intermediate% -in %CAServer%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX% -out %CAServer%.pfx
+IF %ERRORLEVEL% NEQ 0 pause & exit 1
+
+echo %b% certutil -importPFX -f -p %PASSWORD_PFX% %CAServer%.pfx %END%
+echo certutil -importPFX -f -p %PASSWORD_PFX% %CAServer%.pfx >%CAServer%.pfx.cmd
+echo certutil -verify -urlfetch %CAServer%.crt >>%CAServer%.pfx.cmd
+
+echo echo How to revoque IR5 certificates:
+echo echo netsh http delete sslcert ipport=0.0.0.0:8085
+echo echo netsh http delete sslcert ipport=0.0.0.0:8086
+
+goto :EOF
+
+
+:create_CRL_Server
+echo %c%%~0%END%
+
+:: verify it:
+echo %HIGH%%b%  certutil -verify -urlfetch %CAServer%.crt %END%
+
+:: https://blog.didierstevens.com/2013/05/08/howto-make-your-own-cert-and-revocation-list-with-openssl/
+:: Generate an empty CRL (both in PEM and DER):
+openssl ca -batch -config %cfgCAServer% -gencrl -keyfile %CAServer%.key -cert %CAServer%.crt -out %CAServer%.crl.crt
+openssl crl -batch -config %cfgCAServer% -inform PEM -in %CAServer%.crl.crt -outform DER -out %CAServer%.crl
+
+:: verify it:
+echo %HIGH%%b%  certutil -verify -urlfetch %CAServer%.crt %END%
+:: verify it:
+REM certutil -verify -urlfetch %CAServer%.crt
+
+:: a Windows Server 2003 CA will always check revocation on all certificates in the PKI hierarchy (except the root CA certificate) before issuing an end-entity certificate. However in this situation, a valid Certificate Revocation List (CRL) for one or more of the intermediate certification authority (CA) certificates was not be found since the root CA was offline. This issue may occur if the CRL is not available to the certificate server, or if the CRL has expired.
+:: You may disabled the feature that checks revocation on all certificates in the PKI hierarchy with the following command on the CA:
+
+REM certutil –setreg ca\CRLFlags +CRLF_REVCHECK_IGNORE_OFFLINE
 goto :EOF
 
 
@@ -566,7 +726,7 @@ echo %c%%~0%END%
 :: https://blog.didierstevens.com/2013/05/08/howto-make-your-own-cert-and-revocation-list-with-openssl/
 echo:
 echo To revoke the current certificate:
-echo %c%  openssl ca -revoke %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt -keyfile %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key -cert %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt %END%
+echo %c%  openssl ca -revoke %CAServer%.crt -keyfile %CAIntermediate%.key -cert %CAIntermediate%.crt %END%
 
 exit /b 0
 call :create_CRL
@@ -574,64 +734,14 @@ call :create_CRL
 goto :EOF
 
 
-:create_CRL
-echo %c%%~0%END%
-
-:: verify it:
-echo %HIGH%%b%  certutil -verify -urlfetch %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt %END%
-
-:: https://blog.didierstevens.com/2013/05/08/howto-make-your-own-cert-and-revocation-list-with-openssl/
-:: Generate an empty CRL (both in PEM and DER):
-openssl ca -gencrl -keyfile %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.key -cert %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt -out %ORG_Root%\%ORG_Intermediate%\root.crl.crt
-openssl crl -inform PEM -in %ORG_Root%\%ORG_Intermediate%\root.crl.crt -outform DER -out %ORG_Root%\%ORG_Intermediate%\root.crl
-
-:: verify it:
-echo %HIGH%%b%  certutil -verify -urlfetch %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt %END%
-:: verify it:
-REM certutil -verify -urlfetch %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt
-
-:: a Windows Server 2003 CA will always check revocation on all certificates in the PKI hierarchy (except the root CA certificate) before issuing an end-entity certificate. However in this situation, a valid Certificate Revocation List (CRL) for one or more of the intermediate certification authority (CA) certificates was not be found since the root CA was offline. This issue may occur if the CRL is not available to the certificate server, or if the CRL has expired.
-
-:: You may disabled the feature that checks revocation on all certificates in the PKI hierarchy with the following command on the CA:
-
-REM certutil –setreg ca\CRLFlags +CRLF_REVCHECK_IGNORE_OFFLINE
-goto :EOF
-
-
 :create_chain_PEM
 echo %c%%~0%END%
-type %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt %ORG_Root%\ca.%ORG_Root%.crt >%ORG_Root%\ca-chain-bundle.%ORG_Root%.pem 2>NUL
-openssl verify -purpose sslclient -untrusted %ORG_Root%\ca-chain-bundle.%ORG_Root%.pem %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt
+type %CAServer%.crt %CAIntermediate%.crt %CARoot%.crt >%ORG_Root%\ca-chain-bundle.%ORG_Root%.pem 2>NUL
+openssl verify -purpose sslclient -untrusted %ORG_Root%\ca-chain-bundle.%ORG_Root%.pem %CAServer%.crt
 
-openssl x509 -noout -subject -issuer -in %ORG_Root%\ca.%ORG_Root%.crt
-openssl x509 -noout -subject -issuer -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt
-openssl x509 -noout -subject -issuer -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt
-
-goto :EOF
-
-
-:create_PFX_Root_Intermediate_Subscriber
-echo %c%%~0%END%
-
-:: https://stackoverflow.com/questions/9971464/how-to-convert-crt-cetificate-file-to-pfx
-:: CRT + CA: all in one
-REM openssl pkcs12 -export -name "*.%CADOMAIN%" -inkey %ORG_Root%\ca.%ORG_Root%.key -passin pass:%PASSWORD_Root% -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt -certfile %ORG_Root%\ca.%ORG_Root%.crt -passout pass:%PASSWORD_PFX% -out %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx
-
-:: certfile and CAfile seem identical
-openssl pkcs12 -export -name "*.%CADOMAIN%" -out %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx -passout pass:%PASSWORD_PFX% -inkey %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.key -passin pass:%PASSWORD_Subscriber% -chain -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt -in %ORG_Root%\ca.%ORG_Root%.crt 
-openssl pkcs12 -export -name "*.%CADOMAIN%" -inkey %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.key -passin pass:%PASSWORD_Subscriber% -in %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.crt  -in %ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%.crt  -CAfile %ORG_Root%\ca.%ORG_Intermediate%\%ORG_Intermediate%.crt -passout pass:%PASSWORD_PFX% -out %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx 
-
-IF %ERRORLEVEL% NEQ 0 pause & exit 1
-
-echo %b% certutil -importPFX -f -p "%PASSWORD_PFX%" %%~dp0\%CADOMAIN%.pfx %END%
-echo certutil -importPFX -f -p "%PASSWORD_PFX%" %%~dp0\%CADOMAIN%.pfx >%ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx.cmd
-echo certutil -verify -urlfetch %%~dp0\%CADOMAIN%.crt >>%ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx.cmd
-
-echo: >>%ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx.cmd
-echo echo How to revoque IR5 certificates: >>%ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx.cmd
-echo echo netsh http delete sslcert ipport=0.0.0.0:8085 >>%ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx.cmd
-echo echo netsh http delete sslcert ipport=0.0.0.0:8086 >>%ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx.cmd
-echo timeout /t 5 >>%ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx.cmd
+openssl x509 -noout -subject -issuer -in %CARoot%.crt
+openssl x509 -noout -subject -issuer -in %CAIntermediate%.crt
+openssl x509 -noout -subject -issuer -in %CAServer%.crt
 
 goto :EOF
 
@@ -639,10 +749,10 @@ goto :EOF
 :import_chain_CRT
 echo %c%%~0%END%
 
-echo %HIGH%%b%  certutil -importPFX -f -p "%PASSWORD_PFX%" %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx %END%
+echo %HIGH%%b%  certutil -importPFX -f -p "%PASSWORD_PFX%" %CAServer%.pfx %END%
 
 set /p IMPORT=Import PFX? [%IMPORT_PFX%] 
-IF /I "%IMPORT_PFX%"=="y" certutil -importPFX -f -p "%PASSWORD_PFX%" %ORG_Root%\%ORG_Intermediate%\%CADOMAIN%.pfx || pause
+IF /I "%IMPORT_PFX%"=="y" certutil -importPFX -f -p "%PASSWORD_PFX%" %CAServer%.pfx || pause
 goto :EOF
 
 
