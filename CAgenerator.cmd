@@ -283,7 +283,8 @@ powershell -executionPolicy bypass -Command ^(Get-Content %1^) ^| Foreach-Object
        -replace '{PASSWORD_Root}', '%PASSWORD_Root%' `^
        -replace '{PASSWORD_Intermediate}', '%PASSWORD_Intermediate%' `^
        -replace '{PASSWORD_Server}', '%PASSWORD_Server%' `^
-       -replace '{PASSWORD_PFX}', '%PASSWORD_PFX%' `^
+       -replace '{PASSWORD_PFX_Intermediate}', '%PASSWORD_PFX_Intermediate%' `^
+       -replace '{PASSWORD_PFX_Server}', '%PASSWORD_PFX_Server%' `^
        -replace '{countryName}', '%countryName%' `^
        -replace '{stateOrProvinceName}', '%stateOrProvinceName%' `^
        -replace '{localityName}', '%localityName%' `^
@@ -527,11 +528,11 @@ type %CAIntermediate%.crt %CARoot%.crt >%CAIntermediate%.chain.pem
 openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %CAIntermediate%.key -passin pass:%PASSWORD_Intermediate% -in %CAIntermediate%.chain.pem -passout pass:aaaa -out %CAIntermediate%.chain.pfx
 
 :: https://www.phildev.net/ssl/creating_ca.html
-REM openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %CAIntermediate%.key -passin pass:%PASSWORD_Intermediate% -in %CAIntermediate%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX% -out %CAIntermediate%.pfx
+REM openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %CAIntermediate%.key -passin pass:%PASSWORD_Intermediate% -in %CAIntermediate%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX_Intermediate% -out %CAIntermediate%.pfx
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
-echo %b% certutil -importPFX -f -p %PASSWORD_PFX% %CAIntermediate%.pfx %END%
-echo certutil -importPFX -f -p %PASSWORD_PFX% %CAIntermediate%.pfx >%CAIntermediate%.pfx.cmd
+echo %b% certutil -importPFX -f -p %PASSWORD_PFX_Intermediate% %CAIntermediate%.pfx %END%
+echo certutil -importPFX -f -p %PASSWORD_PFX_Intermediate% %CAIntermediate%.pfx >%CAIntermediate%.pfx.cmd
 
 goto :EOF
 
@@ -678,14 +679,14 @@ openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PA
 
 :: https://stackoverflow.com/questions/9971464/how-to-convert-crt-cetificate-file-to-pfx
 :: CRT + CA: all in one
-REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CARoot%.key -passin pass:%PASSWORD_Root% -in %CAServer%.crt -certfile %CARoot%.crt -passout pass:%PASSWORD_PFX% -out %CAServer%.pfx
+REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CARoot%.key -passin pass:%PASSWORD_Root% -in %CAServer%.crt -certfile %CARoot%.crt -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
 
 :: https://www.phildev.net/ssl/creating_ca.html
-REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PASSWORD_Intermediate% -in %CAServer%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX% -out %CAServer%.pfx
+REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PASSWORD_Intermediate% -in %CAServer%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
 IF %ERRORLEVEL% NEQ 0 pause & exit 1
 
-echo %b% certutil -importPFX -f -p %PASSWORD_PFX% %CAServer%.pfx %END%
-echo certutil -importPFX -f -p %PASSWORD_PFX% %CAServer%.pfx >%CAServer%.pfx.cmd
+echo %b% certutil -importPFX -f -p %PASSWORD_PFX_Server% %CAServer%.pfx %END%
+echo certutil -importPFX -f -p %PASSWORD_PFX_Server% %CAServer%.pfx >%CAServer%.pfx.cmd
 echo certutil -verify -urlfetch %CAServer%.crt >>%CAServer%.pfx.cmd
 
 echo echo How to revoque IR5 certificates:
@@ -746,13 +747,13 @@ openssl x509 -noout -subject -issuer -in %CAServer%.crt
 goto :EOF
 
 
-:import_chain_CRT
+:import_PFX_Server
 echo %c%%~0%END%
 
-echo %HIGH%%b%  certutil -importPFX -f -p "%PASSWORD_PFX%" %CAServer%.pfx %END%
+echo %HIGH%%b%  certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %CAServer%.pfx %END%
 
 set /p IMPORT=Import PFX? [%IMPORT_PFX%] 
-IF /I "%IMPORT_PFX%"=="y" certutil -importPFX -f -p "%PASSWORD_PFX%" %CAServer%.pfx || pause
+IF /I "%IMPORT_PFX%"=="y" certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %CAServer%.pfx || pause
 goto :EOF
 
 

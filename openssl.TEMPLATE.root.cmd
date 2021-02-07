@@ -24,9 +24,11 @@ set authorityInfoAccessCaIssuers=certificates.godaddy.com/repository/gdig2.crt
 :: 3650 = 10 years
 set default_days_Root=7300
 
-:: Expert constantly predict the end of 1024bit encryption but, as of 2021 it still has not been breaked; using 2048 your security is improved 2^1024 times
-:: From a security perspective, sha512 it would be pretty pointless: In practical terms, SHA-256 is just as secure as SHA-384 or SHA-512. We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
+:: From a security perspective, sha512 is overkill: In practical terms, SHA-256 is just as secure as SHA-384 or SHA-512. 
+:: We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
 set default_md_Root=sha512
+
+:: Expert constantly predict the end of 1024bit encryption but, as of 2021 it still has not been breaked; using 2048 your security is improved 2^1024 times
 :: https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption
 ::    RSA     ECC
 ::    1024    160
@@ -40,10 +42,12 @@ set default_ecc_Root=521
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
 set PASSWORD_Root=root_key_pass
 
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: req_distinguished_name section, https://en.wikipedia.org/wiki/Certificate_signing_request
-set organizationName=yourCompany Inc.
+set organizationName=caCompany
 :: Subject Organization Name Field: subject:organizationName (OID 2.5.4.10 )
-set organizationalUnitName=YOURDOMAIN
+set organizationalUnitName=YOURORG
 :: Subject Common Name Field: subject:commonName (OID:  2.5.4.3)
 :: Required/Optional:   Deprecated (Discouraged, but not prohibited)
-set commonName=yourCompany Inc.
+set commonName=caCompany YOURORG Root
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
