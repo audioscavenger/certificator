@@ -34,7 +34,7 @@ openssl req -batch -config dadhacks_intermediate.cfg -new -newkey rsa:2048 -keyo
 IF %ERRORLEVEL% NEQ 0 pause
 openssl ca -batch -config dadhacks_root.cfg         -extensions v3_intermediate_ca -days 3650 -notext -md sha512 -in dadhacks\int.DOMAIN.csr -passin pass:aaaa -out dadhacks\int.DOMAIN.crt
 IF %ERRORLEVEL% NEQ 0 pause
-REM error below caused by # policy            = policy_strict
+REM error below caused by # policy            = policy_match
 REM The organizationName field is different between
 REM CA certificate (Organization ca) and the request (Organization int)
 

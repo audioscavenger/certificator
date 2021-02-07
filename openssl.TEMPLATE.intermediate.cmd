@@ -49,13 +49,13 @@ set PASSWORD_PFX_Intermediate=pfx_pass_int
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: req_distinguished_name section, https://en.wikipedia.org/wiki/Certificate_signing_request
 :: Only countryName MUST be 2 chars, the rest can be 64 chars max
-set countryName=US
-set organizationName=yourCompany Inc.
+set countryName_Intermediate=US
+set organizationName_Intermediate=yourCompany Inc.
 :: Subject Organization Name Field: subject:organizationName (OID 2.5.4.10 )
-set organizationalUnitName=YOURDOMAIN
+set organizationalUnitName_Intermediate=YOURDOMAIN
 :: Subject Common Name Field: subject:commonName (OID:  2.5.4.3)
 :: Required/Optional:   Deprecated (Discouraged, but not prohibited)
-set commonName=yourCompany RSA TLS CA
+set commonName_Intermediate=yourCompany RSA TLS CA
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :: [alt_names] section, enter a list of domains to cover; there is no limit
@@ -84,12 +84,12 @@ set IP.4=10.1.13.97
 :: 1.Statement Identifier:  1.3.6.1.4.1.311.42.1 = Microsoft; use yours or 1.3.6.1.4.1 for internal domains
 :: 2.Certificate Type:      Domain Validation:          2.23.140.1.2.1 = domain-validated https://oidref.com/2.23.140.1.2.1
 :: 3.Certificate Type:      Organization Validation:    2.23.140.1.2.2 = subject-identity-validated  https://oidref.com/2.23.140.1.2.2
-set policiesOIDsIntermediate=1.3.6.1.4.1, 2.23.140.1.2.1, 2.23.140.1.2.2
+set policiesOIDs_Intermediate=1.3.6.1.4.1, 2.23.140.1.2.1, 2.23.140.1.2.2,
 
 :: End points policies: OIDs of public policies that apply to your end point / servr CA -----
 :: 1.Statement Identifier:  1.3.6.1.4.1.311.42.1 = Microsoft; use yours or 1.3.6.1.4.1 for internal domains
 :: 2.Certificate Type:      Organization Validation:    2.23.140.1.2.2 = subject-identity-validated  https://oidref.com/2.23.140.1.2.2
-set policiesOIDsSubscriber=1.3.6.1.4.1, 2.23.140.1.2.2
+set policiesOIDs_Server=1.3.6.1.4.1, 2.23.140.1.2.2,
 
 :: https://stackoverflow.com/questions/51641962/how-do-i-create-my-own-extended-validation-certificate-to-display-a-green-bar/51644728
 :: https://www.sysadmins.lv/blog-en/certificate-policies-extension-all-you-should-know-part-1.aspx

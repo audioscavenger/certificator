@@ -44,10 +44,59 @@ set PASSWORD_Root=root_key_pass
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: req_distinguished_name section, https://en.wikipedia.org/wiki/Certificate_signing_request
-set organizationName=caCompany
+:: Only countryName MUST be 2 chars, the rest can be 64 chars max
+:: few CA Root have a country name
+REM set countryName_Root=US
+set organizationName_Root=caCompany
 :: Subject Organization Name Field: subject:organizationName (OID 2.5.4.10 )
-set organizationalUnitName=YOURORG
+set organizationalUnitName_Root=YOURORG
 :: Subject Common Name Field: subject:commonName (OID:  2.5.4.3)
 :: Required/Optional:   Deprecated (Discouraged, but not prohibited)
-set commonName=caCompany YOURORG Root
+set commonName_Root=caCompany YOURORG Root
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:: Intermediate policies: OIDs of public policies that apply to your Intermediate CA ---------
+:: To respect the CA Browser EV Guidelines, you must be registered in IANA under https://www.alvestrand.no/objectid/1.3.6.1.4.1.html
+:: Example: Internet Private: 1.3.6.1.4.1.44947.1.1.1 = OID attached to certificates issued by Let's Encrypt.
+:: Example: some are reserved such as 2.16.840.1.101 = gov; 2.16.840.1.113938 = EQUIFAX INC.; etc
+:: Object Identifiers (OID) are controlled by IANA and you need to register a Private Enterprise Number (PEN), or OID arc under 1.3.6.1.4.1 namespace.
+:: Here is the FREE PEN registration page: http://pen.iana.org/pen/PenApplication.page
+:: Your private namespace OID should be present in the Root CA and Intermediate CA
+
+:: 1.Statement Identifier:  1.3.6.1.4.1.311.42.1 = Microsoft; use yours or 1.3.6.1.4.1 for internal domains
+:: 2.Certificate Type:      Domain Validation:          2.23.140.1.2.1 = domain-validated https://oidref.com/2.23.140.1.2.1
+:: 3.Certificate Type:      Organization Validation:    2.23.140.1.2.2 = subject-identity-validated  https://oidref.com/2.23.140.1.2.2
+set policiesOIDs_Intermediate=1.3.6.1.4.1, 2.23.140.1.2.1, 2.23.140.1.2.2,
+
+:: End points policies: OIDs of public policies that apply to your end point / servr CA -----
+:: 1.Statement Identifier:  1.3.6.1.4.1.311.42.1 = Microsoft; use yours or 1.3.6.1.4.1 for internal domains
+:: 2.Certificate Type:      Organization Validation:    2.23.140.1.2.2 = subject-identity-validated  https://oidref.com/2.23.140.1.2.2
+set policiesOIDs_Server=1.3.6.1.4.1, 2.23.140.1.2.2,
+
+:: https://stackoverflow.com/questions/51641962/how-do-i-create-my-own-extended-validation-certificate-to-display-a-green-bar/51644728
+:: https://www.sysadmins.lv/blog-en/certificate-policies-extension-all-you-should-know-part-1.aspx
+:: 3.Practices Statement:   id-qt-cps: OID for CPS qualifier    1.3.6.1.5.5.7.2.1   https://www.alvestrand.no/objectid/1.3.6.1.5.5.7.2.1.html
+::    1.3.6.1.5.5.7.2 - id-qt policy qualifier types RFC2459
+::    1.3.6.1.5.5.7 - PKIX
+::    1.3.6.1.5.5 - Mechanisms
+::    1.3.6.1.5 - IANA Security-related objects
+::    1.3.6.1 - OID assignments from 1.3.6.1 - Internet
+::    1.3.6 - US Department of Defense
+::    1.3 - ISO Identified Organization
+::    1 - ISO assigned OIDs 
+set policyIdentifier=1.3.6.1.5.5.7.2.1
+:: CPS Point to the Internet Security Research Group (ISRG) Certification Practice Statementer of the CA emiter
+:: that describes the policy under which the certificate in the subject was issued. 
+:: examples: http://cps.letsencrypt.org   http://certificates.godaddy.com/repository/
+set CPS.1=http://yourcompany.com/cps/
+
+:: User Notice is a small piece of text (RFC recommends to use no more than 200 characters) that describes particular policy.
+set explicitText=This certificate protects the private data transmitted throught the local domain YOURDOMAIN, own by yourCompany Inc.
+set organization=yourCompany Inc.
+
+:: X509v3 CRL Distribution Points:
+:: revocation url: you should serve %ORG_Intermediate%.crl (DER) and %ORG_Intermediate%.crl.crt (PEM) over http at this address:
+set crlDistributionPoints.1=http://pki.yourcompany.com/%ORG_Intermediate%.crl
+
+:: //TODO: CT Precertificate SCTs: https://certificate.transparency.dev/howctworks/
+:: //TODO: CT Precertificate SCTs: https://letsencrypt.org/2018/04/04/sct-encoding.html

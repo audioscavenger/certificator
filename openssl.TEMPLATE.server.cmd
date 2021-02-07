@@ -42,32 +42,33 @@ set default_bits_Server=2048
 set default_ecc_Server=384
 
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
-set PASSWORD_Server=subscriber_key_pass
+set PASSWORD_Server=server_key_pass
 :: Password for exported PFX files, can be blank or very simple; not sure it's needed
-set PASSWORD_PFX=pfx_pass_server
+set PASSWORD_PFX_Server=pfx_pass_server
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: req_distinguished_name section, https://en.wikipedia.org/wiki/Certificate_signing_request
 :: Only countryName MUST be 2 chars, the rest can be 64 chars max
-set countryName=US
-set stateOrProvinceName=Arizona
-set localityName=Phoenix
-set organizationName=yourCompany Inc.
+set countryName_Server=US
+set organizationName_Server=yourCompany Inc.
 :: Subject Organization Name Field: subject:organizationName (OID 2.5.4.10 )
-set organizationalUnitName=YOURDOMAIN
+set organizationalUnitName_Server=YOURDOMAIN
 :: Subject Common Name Field: subject:commonName (OID:  2.5.4.3)
 :: Required/Optional:   Deprecated (Discouraged, but not prohibited)
-set commonName=*.INTERNAL.YOURDOMAIN.LOCAL
-set emailAddress=admin@yourcompany.com
+set commonName_Server=*.INTERNAL.YOURDOMAIN.LOCAL
+:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: EV Browser part
+set stateOrProvinceName_Server=Arizona
+set localityName_Server=Phoenix
+set emailAddress_Server=admin@yourcompany.com
 :: optional:
-set postalCode=12345
-set streetAddress=1234 Main St
+set postalCode_Server=12345
+set streetAddress_Server=1234 Main St
 :: secondary company name:
 set unstructuredName=yourCompany Inc.
 :: Subject Business Category Field: subject:businessCategory (OID:  2.5.4.15)
-set businessCategory=Private Organization
+set businessCategory_Server=Private Organization
 :: Subject Jurisdiction of Incorporation or Registration Field: jurisdictionCountryName, jurisdictionStateOrProvinceName, jurisdictionLocalityName
-set jurisdictionCountryName=US
+set jurisdictionCountryName_Server=US
 :: EV certificates: Those 3 required attributes in the DN (businessCategory, serialNumber and jurisdictionCountryName) MUST be present
 :: Subject Registration Number Field:   Subject:serialNumber (OID:  2.5.4.5) 
 :: For Private Organizations, this field MUST contain the Registration (or similar) Number assigned to the Subject  by  the  Incorporating  or  Registration  Agency  in  its  Jurisdiction  of  Incorporation  or  Registration
@@ -101,7 +102,7 @@ set IP.4=10.1.13.97
 :: 1.Statement Identifier:  1.3.6.1.4.1.311.42.1 = Microsoft; use yours or 1.3.6.1.4.1 for internal domains
 :: 2.Certificate Type:      Domain Validation:          2.23.140.1.2.1 = domain-validated https://oidref.com/2.23.140.1.2.1
 :: 3.Certificate Type:      Organization Validation:    2.23.140.1.2.2 = subject-identity-validated  https://oidref.com/2.23.140.1.2.2
-set policiesOIDsIntermediate=1.3.6.1.4.1, 2.23.140.1.2.1, 2.23.140.1.2.2
+set policiesOIDs_Intermediate=1.3.6.1.4.1, 2.23.140.1.2.1, 2.23.140.1.2.2
 
 :: End points policies: OIDs of public policies that apply to your end point / servr CA -----
 :: 1.Statement Identifier:  1.3.6.1.4.1.311.42.1 = Microsoft; use yours or 1.3.6.1.4.1 for internal domains
