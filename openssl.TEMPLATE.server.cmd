@@ -17,11 +17,28 @@ set ORG_Intermediate=YOURDOMAIN
 :: this is your Server short name, used for filenames and could be = to %USERDNSDOMAIN%
 set DOMAIN=INTERNAL.YOURDOMAIN.LOCAL
 
-:: website of the CA emiter:
-set authorityInfoAccessOCSP=ocsp.godaddy.com/
+:: [alt_names] section, enter a list of domains to cover; there is no limit
+:: You can add short machine names, IP addresses, and wildcard domains
+:: Simply increment the DNS.{num} of the variable to add more domains
+:: Delete the lines you do not need starting from the bottom
+:: You cannot use IP ranges https://security.stackexchange.com/questions/91368/ip-range-in-ssl-subject-alternative-name
+set DNS.1=*.INTERNAL.YOURDOMAIN.LOCAL
+set DNS.2=server-cc
+set DNS.3=server-ep-2
+set DNS.4=server-ir5
+set DNS.5=server-pa
+set IP.1=10.1.13.12
+set IP.2=10.1.13.121
+set IP.3=10.1.13.95
+set IP.4=10.1.13.97
 
-:: pkix-cert of the emiter:
-set authorityInfoAccessCaIssuers=certificates.godaddy.com/repository/gdig2.crt
+:::::::::::::::::::::::::::::::::::::
+:: AIA (Authority Information Access): a certificate extension that contains information useful for verifying the trust status of a certificate. 
+:: authorityInfoAccessCaIssuers = url with issuer CA = Intermediate in this case
+:: authorityInfoAccessOCSP = Online Certificate Status Protocol (OCSP) responder configured to provide status for the certificate below.
+set authorityInfoAccessCaIssuers=yourcompany.com/ca.%ORG_Intermediate%.crt
+set authorityInfoAccessOCSP=yourcompany.com/ocsp/
+:::::::::::::::::::::::::::::::::::::
 
 :: 3650 = 10 years
 set default_days_Server=3650
@@ -39,11 +56,22 @@ set default_md_Server=sha256
 ::    7680    384
 ::    15360   521
 set default_bits_Server=2048
-set default_ecc_Server=384
+
+:: https://crypto.stackexchange.com/questions/70889/is-curve-p-384-equal-to-secp384r1?newreg=a86ae3c6cbfd427e94e0a8682450c2cf
+:: => in practice, average clients only support two curves, the ones which are designated in so-called NSA Suite B: 
+:: these are NIST curves P-256 and P-384 (in OpenSSL, they are designated as, respectively, "prime256v1" and "secp384r1"). 
+:: If you use any other curve, then some widespread Web browsers (e.g. Internet Explorer, Firefox...) will be unable to talk to your server.
+:: => FYI www.google.com uses secp384r1; if your browser cannot access google, consider upgrading.
+:: secp384r1 (ASN1 OID) == P-384 (NIST CURVE) = NIST/SECG curve over a 384 bit prime field
+::      NIST-P: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
+::      SECG  : https://www.secg.org/sec2-v2.pdf
+:: prime256v1                               = X9.62/SECG curve over a 256 bit prime field
+:: containder, without participation of the NSA: Curve25519 - UMAC is much faster than HMAC for message authentication in TLS. see RFC http://www.ietf.org/rfc/rfc4418.txt or http://fastcrypto.org/umac/
+set default_ecc_Server=secp384r1
 
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
 set PASSWORD_Server=server_key_pass
-:: Password for exported PFX files, can be blank or very simple; not sure it's needed
+:: Password for exported PFX files, can be blank or very simple; NOT NEEDED FOR Root/CA Chain
 set PASSWORD_PFX_Server=pfx_pass_server
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -76,19 +104,6 @@ set jurisdictionCountryName_Server=US
 REM set serialNumber=1234567890
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-:: [alt_names] section, enter a list of domains to cover; there is no limit
-:: You can add short machine names, IP addresses, and wildcard domains
-:: Simply increment the DNS.{num} of the variable to add more domains
-:: Delete the lines you do not need starting from the bottom
-set DNS.1=*.INTERNAL.YOURDOMAIN.LOCAL
-set DNS.2=server-cc
-set DNS.3=server-ep-2
-set DNS.4=server-ir5
-set DNS.5=server-pa
-set IP.1=10.1.13.12
-set IP.2=10.1.13.121
-set IP.3=10.1.13.95
-set IP.4=10.1.13.97
 
 
 :: Intermediate policies: OIDs of public policies that apply to your Intermediate CA ---------
@@ -123,7 +138,7 @@ set policiesOIDsSubscriber=1.3.6.1.4.1, 2.23.140.1.2.2
 set policyIdentifier=1.3.6.1.5.5.7.2.1
 :: CPS Point to the Internet Security Research Group (ISRG) Certification Practice Statementer of the CA emiter
 :: that describes the policy under which the certificate in the subject was issued. 
-:: examples: http://cps.letsencrypt.org   http://certificates.godaddy.com/repository/
+:: examples: http://cps.letsencrypt.org   http://certificates.godaddy.com/repository/   https://www.digicert.com/legal-repository
 set CPS.1=http://yourcompany.com/cps/
 
 :: User Notice is a small piece of text (RFC recommends to use no more than 200 characters) that describes particular policy.
@@ -131,8 +146,8 @@ set explicitText=This certificate protects the private data transmitted throught
 set organization=yourCompany Inc.
 
 :: X509v3 CRL Distribution Points:
-:: revocation url: you should serve %ORG_Intermediate%.crl (DER) and %ORG_Intermediate%.crl.crt (PEM) over http at this address:
-set crlDistributionPoints.1=http://pki.yourcompany.com/%ORG_Intermediate%.crl
+:: revocation url: you should serve ca.%ORG_Intermediate%.crl (DER) and ca.%ORG_Intermediate%.crl.crt (PEM) over http at this address:
+set crlDistributionPoints.1=http://pki.yourcompany.com/ca.%ORG_Intermediate%.crl
 
 :: //TODO: CT Precertificate SCTs: https://certificate.transparency.dev/howctworks/
 :: //TODO: CT Precertificate SCTs: https://letsencrypt.org/2018/04/04/sct-encoding.html

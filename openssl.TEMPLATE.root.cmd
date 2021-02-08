@@ -15,18 +15,17 @@ set ORG_Root=YOURORG
 :: this is your Intermediate ORGanisation short name and could be = to %USERDOMAIN%
 set ORG_Intermediate=YOURDOMAIN
 
-:: website of the CA emiter:
-set authorityInfoAccessOCSP=ocsp.godaddy.com/
-
-:: pkix-cert of the emiter:
-set authorityInfoAccessCaIssuers=certificates.godaddy.com/repository/gdig2.crt
+:::::::::::::::::::::::::::::::::::::
+:: AIA (Authority Information Access): a certificate extension that contains information useful for verifying the trust status of a certificate. 
+:: this information is always absent from a Root CA
+:::::::::::::::::::::::::::::::::::::
 
 :: 3650 = 10 years
 set default_days_Root=7300
 
 :: From a security perspective, sha512 is overkill: In practical terms, SHA-256 is just as secure as SHA-384 or SHA-512. 
 :: We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
-set default_md_Root=sha512
+set default_md_Root=sha256
 
 :: Expert constantly predict the end of 1024bit encryption but, as of 2021 it still has not been breaked; using 2048 your security is improved 2^1024 times
 :: https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption
@@ -37,7 +36,18 @@ set default_md_Root=sha512
 ::    7680    384
 ::    15360   521
 set default_bits_Root=4096
-set default_ecc_Root=521
+
+:: https://crypto.stackexchange.com/questions/70889/is-curve-p-384-equal-to-secp384r1?newreg=a86ae3c6cbfd427e94e0a8682450c2cf
+:: => in practice, average clients only support two curves, the ones which are designated in so-called NSA Suite B: 
+:: these are NIST curves P-256 and P-384 (in OpenSSL, they are designated as, respectively, "prime256v1" and "secp384r1"). 
+:: If you use any other curve, then some widespread Web browsers (e.g. Internet Explorer, Firefox...) will be unable to talk to your server.
+:: => FYI www.google.com uses secp384r1; if your browser cannot access google, consider upgrading.
+:: secp384r1 (ASN1 OID) == P-384 (NIST CURVE) = NIST/SECG curve over a 384 bit prime field
+::      NIST-P: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
+::      SECG  : https://www.secg.org/sec2-v2.pdf
+:: prime256v1                               = X9.62/SECG curve over a 256 bit prime field
+:: containder, without participation of the NSA: Curve25519 - UMAC is much faster than HMAC for message authentication in TLS. see RFC http://www.ietf.org/rfc/rfc4418.txt or http://fastcrypto.org/umac/
+set default_ecc_Root=secp384r1
 
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
 set PASSWORD_Root=root_key_pass
@@ -54,6 +64,8 @@ set organizationalUnitName_Root=YOURORG
 :: Required/Optional:   Deprecated (Discouraged, but not prohibited)
 set commonName_Root=caCompany YOURORG Root
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
 
 :: Intermediate policies: OIDs of public policies that apply to your Intermediate CA ---------
 :: To respect the CA Browser EV Guidelines, you must be registered in IANA under https://www.alvestrand.no/objectid/1.3.6.1.4.1.html
@@ -87,7 +99,7 @@ set policiesOIDs_Server=1.3.6.1.4.1, 2.23.140.1.2.2,
 set policyIdentifier=1.3.6.1.5.5.7.2.1
 :: CPS Point to the Internet Security Research Group (ISRG) Certification Practice Statementer of the CA emiter
 :: that describes the policy under which the certificate in the subject was issued. 
-:: examples: http://cps.letsencrypt.org   http://certificates.godaddy.com/repository/
+:: examples: http://cps.letsencrypt.org   http://certificates.godaddy.com/repository/   https://www.digicert.com/legal-repository
 set CPS.1=http://yourcompany.com/cps/
 
 :: User Notice is a small piece of text (RFC recommends to use no more than 200 characters) that describes particular policy.
@@ -95,8 +107,8 @@ set explicitText=This certificate protects the private data transmitted throught
 set organization=yourCompany Inc.
 
 :: X509v3 CRL Distribution Points:
-:: revocation url: you should serve %ORG_Intermediate%.crl (DER) and %ORG_Intermediate%.crl.crt (PEM) over http at this address:
-set crlDistributionPoints.1=http://pki.yourcompany.com/%ORG_Intermediate%.crl
+:: revocation url: you should serve ca.%ORG_Intermediate%.crl (DER) and ca.%ORG_Intermediate%.crl.crt (PEM) over http at this address:
+set crlDistributionPoints.1=http://pki.yourcompany.com/ca.%ORG_Intermediate%.crl
 
 :: //TODO: CT Precertificate SCTs: https://certificate.transparency.dev/howctworks/
 :: //TODO: CT Precertificate SCTs: https://letsencrypt.org/2018/04/04/sct-encoding.html

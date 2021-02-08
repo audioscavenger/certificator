@@ -12,9 +12,9 @@ set ORG_Root=NQSALES
 
 :: Authority Information Access: -------------------------------------------------
 :: website of the CA emiter:
-set authorityInfoAccessOCSP=sales-cc.INTERNAL.YOURDOMAIN.LOCAL/ocsp.html
-:: pkix-cert of the emiter:
-set authorityInfoAccessCaIssuers=sales-cc.INTERNAL.YOURDOMAIN.LOCAL/pkix.NQSALES.crt
+set authorityInfoAccessOCSP=sales-cc.INTERNAL.NQSALES.COM/ocsp/
+:: cert of the emiter:
+set authorityInfoAccessCaIssuers=sales-cc.INTERNAL.NQSALES.COM/int.NQSALES.crt
 
 :: 3650 = 10 years
 set default_days=3650
@@ -82,7 +82,7 @@ set IP.9=10.1.13.81
 :: X509v3 Certificate Policies:
 :: CPS Point to the Internet Security Research Group (ISRG) Certification Practice Statementer of the CA emiter
 :: that describes the policy under which the certificate in the subject was issued. 
-:: examples: http://cps.letsencrypt.org   http://certificates.godaddy.com/repository/
+:: examples: http://cps.letsencrypt.org   http://certificates.godaddy.com/repository/   https://www.digicert.com/legal-repository
 set CPS.1=https://www.nqzw.com/
 :: OIDs of public policies that apply to you. Add at least one.
 :: Example: 2.23.140.1.2.1 = https://oidref.com/2.23.140.1.2.1 = domain-validated

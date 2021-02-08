@@ -41,6 +41,9 @@ REM openssl x509 -text -noout -in www.nqzw.com.crt
 ::  1.5.2   added RSA vs ECC option
 ::  1.5.3   moved cmd/cfg around
 ::  1.5.4   TESTED WORKING
+::  1.5.5   duped ocsp_section ia/server
+::  1.5.6   duped crl_section ia/server
+::  1.5.7   cosmetics and bugfixes
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
@@ -54,7 +57,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
 
 
 :init
-set version=1.5.1
+set version=1.5.7
 set author=lderewonko
 
 call :detect_admin_mode
@@ -62,10 +65,10 @@ call :set_colors
 
 set PAUSE=echo:
 REM set PAUSE=pause
-set DEMO=y
+REM set DEMO=true
 set RESET=y
-set FORCE_Root=y
-set FORCE_Intermediate=y
+set FORCE_Root=n
+set FORCE_Intermediate=n
 set FORCE_Server=y
 set IMPORT_PFX=n
 
@@ -91,16 +94,21 @@ set DOMAIN_DEMO=INTERNAL.YOURDOMAIN.LOCAL
 set ORG_Root=%ORG_Root_DEMO%
 set ORG_Intermediate=%ORG_Intermediate_DEMO%
 set DOMAIN=%DOMAIN_DEMO%
-IF DEFINED DEMO goto :main
+IF /I "%DEMO%"=="y" goto :main
 
 set ORG_Root=
 set ORG_Intermediate=%USERDOMAIN%
 set DOMAIN=%USERDNSDOMAIN%
 set /P         ORG_Root=Organisation?  [%ORG_Root%] 
+call %ORG_Root%\openssl.%ORG_Root%.cmd >NUL 2>&1
 set /P ORG_Intermediate=Intermediate?  [%ORG_Intermediate%] 
+call %ORG_Root%\openssl.%ORG_Intermediate%.cmd >NUL 2>&1
 set /P           DOMAIN=Server DOMAIN? [%DOMAIN%] 
-set /P       ENCRYPTION=ENCRYPTION?    [%ENCRYPTION%/ECC] 
-)
+call %ORG_Root%\%ORG_Intermediate%\openssl.%DOMAIN%.cmd >NUL 2>&1
+
+:: ENCRYPTION can be different for each section
+REM set /P       ENCRYPTION=RSA or ECC?    [%ENCRYPTION%] 
+
 IF NOT DEFINED ORG_Root         call :error Organisation is required
 IF NOT DEFINED ORG_Intermediate call :error Intermediate is required
 IF NOT DEFINED DOMAIN           call :error DOMAIN is required
@@ -121,8 +129,15 @@ call :init_cfg
 ::    7680    384
 ::    15360   521
 :: https://crypto.stackexchange.com/questions/70889/is-curve-p-384-equal-to-secp384r1?newreg=a86ae3c6cbfd427e94e0a8682450c2cf
-:: ASN1 OID: secp521r1 == NIST CURVE: P-521 = NIST/SECG curve over a 384 bit prime field
+:: => in practice, average clients only support two curves, the ones which are designated in so-called NSA Suite B: 
+:: these are NIST curves P-256 and P-384 (in OpenSSL, they are designated as, respectively, "prime256v1" and "secp384r1"). 
+:: If you use any other curve, then some widespread Web browsers (e.g. Internet Explorer, Firefox...) will be unable to talk to your server.
+:: => FYI www.google.com uses secp384r1; if your browser cannot access google, consider upgrading.
+:: ASN1 OID: secp384r1 == NIST CURVE: P-384 = NIST/SECG curve over a 384 bit prime field
+::      NIST-P: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
+::      SECG  : https://www.secg.org/sec2-v2.pdf
 :: prime256v1                               = X9.62/SECG curve over a 256 bit prime field
+:: containder, without participation of the NSA: Curve25519 - UMAC is much faster than HMAC for message authentication in TLS. see RFC http://www.ietf.org/rfc/rfc4418.txt or http://fastcrypto.org/umac/
 
 call :create_KEY_Root_%ENCRYPTION%
 %PAUSE%
@@ -147,11 +162,12 @@ call :create_CSR_Server
 %PAUSE%
 call :create_CRT_Server
 %PAUSE%
-call :create_PFX_chainServer
+call :create_PFX_ServerChain
 %PAUSE%
 call :create_CRL_Server
 %PAUSE%
 
+call :import_PFX_Server
 :: //TODO: test revoking
 REM call :revoke_CRT_Intermediate
 REM call :revoke_CRT_Server
@@ -300,6 +316,7 @@ powershell -executionPolicy bypass -Command ^(Get-Content %1^) ^| Foreach-Object
        -replace '{PASSWORD_PFX_Intermediate}', '%PASSWORD_PFX_Intermediate%' `^
        -replace '{PASSWORD_PFX_Server}', '%PASSWORD_PFX_Server%' `^
        -replace '{challengePassword}', '%challengePassword%' `^
+       -replace '{permittedEmailDomain}', '%permittedEmailDomain%' `^
        -replace '{countryName_Server}', '%countryName_Server%' `^
        -replace '{organizationName_Server}', '%organizationName_Server%' `^
        -replace '{organizationalUnitName_Server}', '%organizationalUnitName_Server%' `^
@@ -395,7 +412,7 @@ IF EXIST %CARoot%.key exit /b 0
 :: https://stackoverflow.com/questions/64961096/what-is-the-suggested-openssl-command-to-generate-ec-key-and-csr-compatible-with
 :: https://www.openssl.org/docs/man1.1.0/man1/genpkey.html
 :: options 1: why you need to store the params: https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations
-openssl ecparam -out %CARoot%.param.crt -name secp%default_ECC_Root%r1 -param_enc explicit
+openssl ecparam -out %CARoot%.param.crt -name %default_ECC_Root% -param_enc explicit
 openssl genpkey -paramfile %CARoot%.param.crt -pass pass:%PASSWORD_Root% -out %CARoot%.key
 
 :: options 1b:
@@ -454,31 +471,6 @@ IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 goto :EOF
 
 
-:create_CRL_Root-what is that for?
-echo %c%%~0%END%
-
-:: verify it:
-echo %HIGH%%b%  certutil -verify -urlfetch %CARoot%.crt %END%
-
-:: https://blog.didierstevens.com/2013/05/08/howto-make-your-own-cert-and-revocation-list-with-openssl/
-:: Generate an empty CRL (both in PEM and DER):
-openssl ca -batch -config %cfgCARoot%.cfg -gencrl -passin pass:%PASSWORD_Root% -keyfile %CARoot%.key -cert %CARoot%.crt -out %CARoot%.crl.crt
-IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
-openssl crl -inform PEM -in %CARoot%.crl.crt -outform DER -out %CARoot%.crl
-IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
-
-:: verify it:
-echo %HIGH%%b%  certutil -verify -urlfetch %CARoot%.crt %END%
-:: verify it:
-REM certutil -verify -urlfetch %CARoot%.crt
-
-:: a Windows Server 2003 CA will always check revocation on all certificates in the PKI hierarchy (except the root CA certificate) before issuing an end-entity certificate. However in this situation, a valid Certificate Revocation List (CRL) for one or more of the Root certification authority (CA) certificates was not be found since the root CA was offline. This issue may occur if the CRL is not available to the certificate server, or if the CRL has expired.
-:: You may disabled the feature that checks revocation on all certificates in the PKI hierarchy with the following command on the CA:
-
-REM certutil –setreg ca\CRLFlags +CRLF_REVCHECK_IGNORE_OFFLINE
-goto :EOF
-
-
 :O---------O
 :Intermediate
 :O---------O
@@ -513,7 +505,7 @@ IF EXIST %CAIntermediate%.key exit /b 0
 :: https://stackoverflow.com/questions/64961096/what-is-the-suggested-openssl-command-to-generate-ec-key-and-csr-compatible-with
 :: https://www.openssl.org/docs/man1.1.0/man1/genpkey.html
 :: options 1: why you need to store the params: https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations
-openssl ecparam -out %CAIntermediate%.param.crt -name secp%default_ECC_Intermediate%r1
+openssl ecparam -out %CAIntermediate%.param.crt -name %default_ECC_Intermediate% -param_enc explicit
 openssl genpkey -paramfile %CAIntermediate%.param.crt -pass pass:%PASSWORD_Intermediate% -out %CAIntermediate%.key
 
 :: options 2:
@@ -571,7 +563,7 @@ REM -notext
 REM echo|set /p=>%ORG_Root%\index.txt
 :: WARNING using cfgCARoot to sign the Intermediate CSR is indeed correct!
 :: That is why we cannot let the client regenerate the CAIntermediate themselves: they would need the CARoot password
-openssl ca -batch -config %cfgCARoot%.cfg -create_serial -passin pass:%PASSWORD_Root% -extensions v3_intermediate_ca -in %CAIntermediate%.csr -out %CAIntermediate%.crt
+openssl ca -batch -config %cfgCARoot%.cfg -create_serial -rand_serial -updatedb -passin pass:%PASSWORD_Root% -extensions v3_intermediate_ca -in %CAIntermediate%.csr -out %CAIntermediate%.crt
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 
 certutil -dump %CAIntermediate%.crt | findstr /b /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do @echo %c%THUMBPRINT =%END% %%t
@@ -599,9 +591,9 @@ openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %CAIntermedi
 REM openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %CAIntermediate%.key -passin pass:%PASSWORD_Intermediate% -in %CAIntermediate%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX_Intermediate% -out %CAIntermediate%.chain.pfx
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 
-echo %b% certutil -importPFX -f -p %PASSWORD_PFX_Intermediate% %CAIntermediate%.chain.pfx %END%
-echo @pushd %%~dp0 >%CAServer%.chain.pfx.cmd
-echo certutil -importPFX -f -p %PASSWORD_PFX_Intermediate% ca.%ORG_Intermediate%.chain.pfx >>%CAIntermediate%.chain.pfx.cmd
+echo %b% certutil -importPFX -f -p "%PASSWORD_PFX_Intermediate%" %CAIntermediate%.chain.pfx %END%
+echo @pushd %%~dp0 >%CAIntermediate%.chain.pfx.cmd
+echo certutil -importPFX -f -p "%PASSWORD_PFX_Intermediate%" ca.%ORG_Intermediate%.chain.pfx >>%CAIntermediate%.chain.pfx.cmd
 
 goto :EOF
 
@@ -664,7 +656,7 @@ IF EXIST %CAServer%.key exit /b 0
 :: https://stackoverflow.com/questions/64961096/what-is-the-suggested-openssl-command-to-generate-ec-key-and-csr-compatible-with
 :: https://www.openssl.org/docs/man1.1.0/man1/genpkey.html
 :: options 1: why you need to store the params: https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations
-openssl ecparam -out %CAServer%.param.crt -name secp%default_ECC_Server%r1
+openssl ecparam -out %CAServer%.param.crt -name %default_ECC_Server% -param_enc explicit
 openssl genpkey -paramfile %CAServer%.param.crt -pass pass:%PASSWORD_Server% -out %CAServer%.key
 
 :: options 2:
@@ -722,7 +714,7 @@ REM -notext
 REM echo|set /p=>%ORG_Root%\index.txt
 :: WARNING using cfgCAIntermediate to sign the Server CSR is indeed correct!
 :: That is why we cannot let the client regenerate the CAServer themselves: they would need the CARoot password
-openssl ca -batch -config %cfgCAIntermediate%.cfg -create_serial -passin pass:%PASSWORD_Intermediate% -extensions v3_server_ca -in %CAServer%.csr -out %CAServer%.crt
+openssl ca -batch -config %cfgCAIntermediate%.cfg -create_serial -rand_serial -updatedb -passin pass:%PASSWORD_Intermediate% -extensions v3_server_ca -in %CAServer%.csr -out %CAServer%.crt
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 
 certutil -dump %CAServer%.crt | findstr /b /c:"Cert Hash(sha1)" | for /f "tokens=3" %%t in ('more') do @echo %c%THUMBPRINT =%END% %%t
@@ -754,9 +746,9 @@ REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CARoot%.key -passin pass:%
 REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PASSWORD_Intermediate% -in %CAServer%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 
-echo %b% certutil -importPFX -f -p %PASSWORD_PFX_Server% %CAServer%.chain.pfx %END%
+echo %b% certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %CAServer%.chain.pfx %END%
 echo @pushd %%~dp0 >%CAServer%.chain.pfx.cmd
-echo certutil -importPFX -f -p %PASSWORD_PFX_Server% %DOMAIN%.chain.pfx >>%CAServer%.chain.pfx.cmd
+echo certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %DOMAIN%.chain.pfx >>%CAServer%.chain.pfx.cmd
 echo certutil -verify -urlfetch %DOMAIN%.crt >>%CAServer%.chain.pfx.cmd
 echo pause >>%CAServer%.chain.pfx.cmd
 
@@ -767,6 +759,7 @@ echo echo netsh http delete sslcert ipport=0.0.0.0:8086
 goto :EOF
 
 
+:: not sure it's needed, many issuers have only one url anyway
 :create_CRL_Server
 echo %c%%~0%END%
 
@@ -792,13 +785,15 @@ goto :EOF
 
 :O---------O
 
-:revoke_CRT
+:revoke_CRT-TODO
 echo %c%%~0%END%
 
 :: https://blog.didierstevens.com/2013/05/08/howto-make-your-own-cert-and-revocation-list-with-openssl/
 echo:
-echo To revoke the current certificate:
-echo %c%  openssl ca -revoke %CAServer%.crt -keyfile %CAIntermediate%.key -cert %CAIntermediate%.crt %END%
+echo To revoke CAServer certificate:
+echo %c%  openssl ca -revoke %CAServer%.crt -updatedb -keyfile %CAIntermediate%.key -cert %CAIntermediate%.crt %END%
+echo To revoke CAIntermediate certificate:
+echo %c%  openssl ca -revoke %CAIntermediate%.crt -updatedb -keyfile %CARoot%.key -cert %CARoot%.crt %END%
 
 exit /b 0
 call :create_CRL
@@ -806,25 +801,13 @@ call :create_CRL
 goto :EOF
 
 
-:create_chain_PEM
-echo %c%%~0%END%
-type %CAServer%.crt %CAIntermediate%.crt %CARoot%.crt >%ORG_Root%\ca-chain-bundle.%ORG_Root%.pem 2>NUL
-openssl verify -purpose sslclient -untrusted %ORG_Root%\ca-chain-bundle.%ORG_Root%.pem %CAServer%.crt
-
-openssl x509 -noout -subject -issuer -in %CARoot%.crt
-openssl x509 -noout -subject -issuer -in %CAIntermediate%.crt
-openssl x509 -noout -subject -issuer -in %CAServer%.crt
-
-goto :EOF
-
-
 :import_PFX_Server
 echo %c%%~0%END%
 
-echo %HIGH%%b%  certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %CAServer%.pfx %END%
+echo %HIGH%%b%  certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %CAServer%.chain.pfx %END%
 
 set /p IMPORT=Import PFX? [%IMPORT_PFX%] 
-IF /I "%IMPORT_PFX%"=="y" certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %CAServer%.pfx || pause
+IF /I "%IMPORT_PFX%"=="y" certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %CAServer%.chain.pfx || pause
 goto :EOF
 
 
