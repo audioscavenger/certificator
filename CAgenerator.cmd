@@ -7,6 +7,17 @@ REM openssl s_client -showcerts -connect https://www.nqzw.com
 REM openssl s_client -servername  www.nqzw.com -connect www.nqzw.com:443 | sed -ne "/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p" > www.nqzw.com.crt
 REM openssl x509 -text -noout -in www.nqzw.com.crt
 
+:: //TODO: install Microsoft Online Responder Service
+:: https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/cc770413(v=ws.10)?redirectedfrom=MSDN
+:: Create/delete web virtual roots for OCSP web proxy:
+REM certutil -vocsproot delete
+REM certutil -vocsproot
+REM net stop certsvc && net start certsvc && iisreset
+:: CertUtil: -vocsproot command FAILED: 0x80070002 (WIN32: 2 ERROR_FILE_NOT_FOUND)
+:: During Online Responder installation an OCSP virtual directory is created under the Default Web Site in Internet Information Service (IIS), by the command certutil -vocsproot. However, the command will fail if the Default Web Site is missing or has otherwise been reconfigured.
+:: Test ocsp: https://social.technet.microsoft.com/Forums/en-US/25d15b66-d32a-414d-8154-14662d66bdca/urgent-help-needed-about-online-responder?forum=winserversecurity
+REM certutil -url %DOMAIN%.crt
+
 :: //TODO: separate CSR from KEY
 :: //TODO: working example = microsoft.com certificate
 :: //TODO: store Server serial.pem in its rightful folder
@@ -44,6 +55,7 @@ REM openssl x509 -text -noout -in www.nqzw.com.crt
 ::  1.5.5   duped ocsp_section ia/server
 ::  1.5.6   duped crl_section ia/server
 ::  1.5.7   cosmetics and bugfixes
+::  1.5.8   bugfixes
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
@@ -57,7 +69,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
 
 
 :init
-set version=1.5.7
+set version=1.5.8
 set author=lderewonko
 
 call :detect_admin_mode
@@ -66,9 +78,9 @@ call :set_colors
 set PAUSE=echo:
 REM set PAUSE=pause
 REM set DEMO=true
-set RESET=y
+set RESET=n
 set FORCE_Root=n
-set FORCE_Intermediate=n
+set FORCE_Intermediate=y
 set FORCE_Server=y
 set IMPORT_PFX=n
 
@@ -546,7 +558,7 @@ echo %HIGH%%b%  openssl x509 -text -noout -in %CAIntermediate%.crt %END%
 :: verify it:
 echo %HIGH%%b%  certutil -verify -urlfetch %CAIntermediate%.crt %END%
 
-IF EXIST %CAIntermediate%.crt IF /I NOT "%FORCE_Intermediate%"=="y" exit /b 0
+IF EXIST %CAIntermediate%.crt IF /I NOT "%FORCE_Intermediate%"=="y" (exit /b 0) ELSE echo|set /p=>%ORG_Root%\index.txt
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
 REM openssl x509 -req -%default_md_Intermediate% -days %default_days_Intermediate% -CA %CARoot%.crt -CAkey %CARoot%.key -CAcreateserial -CAserial %CAIntermediate%.srl -extfile openssl.%ORG_Root%.cfg -extensions v3_intermediate_ca -in %CAIntermediate%.csr -out %CAIntermediate%.crt
@@ -697,7 +709,7 @@ echo %HIGH%%b%  openssl x509 -text -noout -in %CAServer%.crt %END%
 :: verify it:
 echo %HIGH%%b%  certutil -verify -urlfetch %CAServer%.crt %END%
 
-IF EXIST %CAServer%.crt IF /I NOT "%FORCE_Server%"=="y" exit /b 0
+IF EXIST %CAServer%.crt IF /I NOT "%FORCE_Server%"=="y" (exit /b 0) ELSE echo|set /p=>%ORG_Root%\%ORG_Intermediate%\index.txt
 
 :: https://adfinis.com/en/blog/openssl-x509-certificates/
 REM openssl x509 -req -%default_md_Server% -days %default_days_Server% -CA %CARoot%.crt -CAkey %CARoot%.key -CAcreateserial -CAserial %CAServer%.srl -extfile openssl.%ORG_Root%.cfg -extensions v3_server_ca -in %CAServer%.csr -out %CAServer%.crt
@@ -750,11 +762,13 @@ echo %b% certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %CAServer%.chain.pfx 
 echo @pushd %%~dp0 >%CAServer%.chain.pfx.cmd
 echo certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %DOMAIN%.chain.pfx >>%CAServer%.chain.pfx.cmd
 echo certutil -verify -urlfetch %DOMAIN%.crt >>%CAServer%.chain.pfx.cmd
+echo: >>%CAServer%.chain.pfx.cmd
+echo certutil -dump %DOMAIN%.crt ^| findstr /b /c:"Cert Hash(sha1)" ^| for /f "tokens=3" %%%%t in ('more') do for /f "usebackq delims=" %%%%I in (`powershell "\"%%%%t\".toUpper()"`) do @echo %c%THUMBPRINT =%END% %%%%~I >>%CAServer%.chain.pfx.cmd
+echo: >>%CAServer%.chain.pfx.cmd
+echo echo How to revoque IR5 certificates: >>%CAServer%.chain.pfx.cmd
+echo echo netsh http delete sslcert ipport=0.0.0.0:8085 >>%CAServer%.chain.pfx.cmd
+echo echo netsh http delete sslcert ipport=0.0.0.0:8086 >>%CAServer%.chain.pfx.cmd
 echo pause >>%CAServer%.chain.pfx.cmd
-
-echo echo How to revoque IR5 certificates:
-echo echo netsh http delete sslcert ipport=0.0.0.0:8085
-echo echo netsh http delete sslcert ipport=0.0.0.0:8086
 
 goto :EOF
 

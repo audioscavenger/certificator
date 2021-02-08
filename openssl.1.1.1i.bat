@@ -1,5 +1,5 @@
 @echo off
-@set PATH=%~dp0_slproweb;%PATH%
+@set PATH=%~dp0bin;%PATH%
 
 title Win64 OpenSSL Command Prompt
 echo Win64 OpenSSL Command Prompt

@@ -21,6 +21,7 @@ set DOMAIN=INTERNAL.YOURDOMAIN.LOCAL
 :: AIA (Authority Information Access): a certificate extension that contains information useful for verifying the trust status of a certificate. 
 :: authorityInfoAccessCaIssuers = url with issuer CA = not provided for Intermediate
 :: authorityInfoAccessOCSP = Online Certificate Status Protocol (OCSP) responder configured to provide status for the certificate below.
+REM set authorityInfoAccessCaIssuers=yourcompany.com/ca.%ORG_Root%.crt
 set authorityInfoAccessOCSP=yourcompany.com/ocsp/
 :::::::::::::::::::::::::::::::::::::
 
