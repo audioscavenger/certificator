@@ -56,6 +56,7 @@ REM certutil -url %DOMAIN%.crt
 ::  1.5.6   duped crl_section ia/server
 ::  1.5.7   cosmetics and bugfixes
 ::  1.5.8   bugfixes
+::  1.5.9   include openssl 1.1.1i
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
@@ -69,8 +70,9 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
 
 
 :init
-set version=1.5.8
+set version=1.5.9
 set author=lderewonko
+title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
 call :detect_admin_mode
 call :set_colors
@@ -80,7 +82,7 @@ REM set PAUSE=pause
 REM set DEMO=true
 set RESET=n
 set FORCE_Root=n
-set FORCE_Intermediate=y
+set FORCE_Intermediate=n
 set FORCE_Server=y
 set IMPORT_PFX=n
 
@@ -88,6 +90,8 @@ set IMPORT_PFX=n
 :prechecks
 for %%x in (powershell.exe) do (set "powershell=%%~$PATH:x")
 IF NOT DEFINED powershell call :error %~0: powershell NOT FOUND
+
+where openssl >NUL 2>&1 || set "PATH=%~dp0bin;%PATH%"
 
 call :check_exist_exit openssl.TEMPLATE.Root.cfg
 call :check_exist_exit openssl.TEMPLATE.intermediate.cfg
