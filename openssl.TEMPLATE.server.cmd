@@ -71,8 +71,8 @@ set default_ecc_Server=secp384r1
 
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
 set PASSWORD_Server=server_key_pass
-:: Password for exported PFX files, can be blank or very simple; NOT NEEDED FOR Root/CA Chain
-set PASSWORD_PFX_Server=pfx_pass_server
+:: Password for exported PFX files, cannot be blank because of java\keytool
+set PASSWORD_PFX_Server=1234567890
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: req_distinguished_name section, https://en.wikipedia.org/wiki/Certificate_signing_request

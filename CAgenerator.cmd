@@ -58,6 +58,7 @@ REM certutil -url %DOMAIN%.crt
 ::  1.5.8   bugfixes
 ::  1.5.9   include openssl 1.1.1i
 ::  1.6.0   now delete the CA before import!
+::  1.6.1   PFX password cannot be blank because of java\keytool
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
@@ -71,7 +72,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
 
 
 :init
-set version=1.6.0
+set version=1.6.1
 set author=lderewonko
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
@@ -790,7 +791,7 @@ echo pause >>%CAServer%.chain.pfx.cmd
 :: Question: How do I move a certificate from IIS / PFX (.p12 file) to a JKS (Java KeyStore)?
 REM %JDK_HOME%\bin\keytool -importkeystore -srckeystore PFX_P12_FILE_NAME -srcstoretype pkcs12 -srcstorepass PFX_P12_FILE -srcalias SOURCE_ALIAS -destkeystore KEYSTORE_FILE -deststoretype jks -deststorepass PASSWORD -destalias ALIAS_NAME
 :: Note: To find the srcalias, list the contents of the PFX/P12 file:
-REM %JDK_HOME%\bin\keytool -v -list -storetype pkcs12 -srcstorepass server_pfx_pass -keystore "D:\nQSupport\config-SALES-EP-2\cert\INTERNAL.NQSALES.COM.chain.pfx"
+REM %JDK_HOME%\bin\keytool -v -list -storetype pkcs12 -keystore \\sales-cc\cert\INTERNAL.NQSALES.COM.chain.pfx
 
 :: delete them:
 REM powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My -Recurse ^| Get-ChildItem ^| where {$_.FriendlyName -like '*.INTERNAL.NQSALES.COM'} ^| Remove-Item

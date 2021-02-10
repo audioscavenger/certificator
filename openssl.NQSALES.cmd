@@ -27,7 +27,7 @@ set default_bits=2048
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
 set PASSWORD_Root=INTERNAL.NQSALES.COM
 
-:: Password for exported PFX files, can be blank or very simple
+:: Password for exported PFX files, cannot be blank because of java\keytool
 set PASSWORD_PFX=INTERNAL.NQSALES.COM
 
 :: req_distinguished_name section, https://en.wikipedia.org/wiki/Certificate_signing_request

@@ -56,7 +56,7 @@ set default_ecc_Intermediate=secp384r1
 
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
 set PASSWORD_Intermediate=intermediate_key_pass
-:: Password for exported PFX files, can be blank or very simple; NOT NEEDED FOR Root/CA Chain
+:: Password for exported PFX files, can be blank
 set PASSWORD_PFX_Intermediate=
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
