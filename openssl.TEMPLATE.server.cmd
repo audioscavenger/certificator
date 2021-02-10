@@ -82,7 +82,7 @@ set organizationName_Server=yourCompany Inc.
 :: Subject Organization Name Field: subject:organizationName (OID 2.5.4.10 )
 set organizationalUnitName_Server=YOURDOMAIN
 :: Subject Common Name Field: subject:commonName (OID:  2.5.4.3)
-:: Required/Optional:   Deprecated (Discouraged, but not prohibited)
+:: Required/Optional:   Required for a Server certificate
 set commonName_Server=*.INTERNAL.YOURDOMAIN.LOCAL
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: EV Browser part
 set stateOrProvinceName_Server=Arizona

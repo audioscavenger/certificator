@@ -57,6 +57,7 @@ REM certutil -url %DOMAIN%.crt
 ::  1.5.7   cosmetics and bugfixes
 ::  1.5.8   bugfixes
 ::  1.5.9   include openssl 1.1.1i
+::  1.6.0   now delete the CA before import!
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
@@ -70,7 +71,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
 
 
 :init
-set version=1.5.9
+set version=1.6.0
 set author=lderewonko
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
@@ -235,7 +236,7 @@ goto :EOF
 echo %c%%~0%END%
 
 IF /I "%RESET%"=="y" (
-  for %%e in (cfg txt old csr crt pem pfx) DO (
+  for %%e in (cfg txt old key csr crt pem pfx) DO (
     del /f /q /s %ORG_Root%\*.%%e >NUL 2>&1
     del /f /q /s %ORG_Root%\%ORG_Intermediate%\*.%%e >NUL 2>&1
   )
@@ -607,8 +608,13 @@ openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %CAIntermedi
 REM openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey %CAIntermediate%.key -passin pass:%PASSWORD_Intermediate% -in %CAIntermediate%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX_Intermediate% -out %CAIntermediate%.chain.pfx
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 
+:: list them:
+REM powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My -Recurse ^| Format-Table Thumbprint, Subject ^| 
+
 echo %b% certutil -importPFX -f -p "%PASSWORD_PFX_Intermediate%" %CAIntermediate%.chain.pfx %END%
 echo @pushd %%~dp0 >%CAIntermediate%.chain.pfx.cmd
+echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\Root -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Root%*'} ^^^| Remove-Item  >>%CAIntermediate%.chain.pfx.cmd
+echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\CA -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Intermediate%*'} ^^^| Remove-Item  >>%CAIntermediate%.chain.pfx.cmd
 echo certutil -importPFX -f -p "%PASSWORD_PFX_Intermediate%" ca.%ORG_Intermediate%.chain.pfx >>%CAIntermediate%.chain.pfx.cmd
 
 goto :EOF
@@ -762,8 +768,14 @@ REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CARoot%.key -passin pass:%
 REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PASSWORD_Intermediate% -in %CAServer%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 
+:: list them:
+REM powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My -Recurse ^| Format-Table Thumbprint, FriendlyName
+
 echo %b% certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %CAServer%.chain.pfx %END%
 echo @pushd %%~dp0 >%CAServer%.chain.pfx.cmd
+echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\Root -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Root%*'} ^^^| Remove-Item  >>%CAServer%.chain.pfx.cmd
+echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\CA -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Intermediate%*'} ^^^| Remove-Item  >>%CAServer%.chain.pfx.cmd
+echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My -Recurse ^^^| Get-ChildItem ^^^| where {$_.FriendlyName -like '*.%DOMAIN%'} ^^^| Remove-Item  >>%CAServer%.chain.pfx.cmd
 echo certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %DOMAIN%.chain.pfx >>%CAServer%.chain.pfx.cmd
 echo certutil -verify -urlfetch %DOMAIN%.crt >>%CAServer%.chain.pfx.cmd
 echo: >>%CAServer%.chain.pfx.cmd
@@ -773,6 +785,15 @@ echo echo How to revoque IR5 certificates: >>%CAServer%.chain.pfx.cmd
 echo echo netsh http delete sslcert ipport=0.0.0.0:8085 >>%CAServer%.chain.pfx.cmd
 echo echo netsh http delete sslcert ipport=0.0.0.0:8086 >>%CAServer%.chain.pfx.cmd
 echo pause >>%CAServer%.chain.pfx.cmd
+
+:: https://stackoverflow.com/questions/10338543/what-causes-keytool-error-failed-to-decrypt-safe-contents-entry/10338940#10338940
+:: Question: How do I move a certificate from IIS / PFX (.p12 file) to a JKS (Java KeyStore)?
+REM %JDK_HOME%\bin\keytool -importkeystore -srckeystore PFX_P12_FILE_NAME -srcstoretype pkcs12 -srcstorepass PFX_P12_FILE -srcalias SOURCE_ALIAS -destkeystore KEYSTORE_FILE -deststoretype jks -deststorepass PASSWORD -destalias ALIAS_NAME
+:: Note: To find the srcalias, list the contents of the PFX/P12 file:
+REM %JDK_HOME%\bin\keytool -v -list -storetype pkcs12 -srcstorepass server_pfx_pass -keystore "D:\nQSupport\config-SALES-EP-2\cert\INTERNAL.NQSALES.COM.chain.pfx"
+
+:: delete them:
+REM powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My -Recurse ^| Get-ChildItem ^| where {$_.FriendlyName -like '*.INTERNAL.NQSALES.COM'} ^| Remove-Item
 
 goto :EOF
 
