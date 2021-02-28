@@ -59,6 +59,8 @@ REM certutil -url %DOMAIN%.crt
 ::  1.5.9   include openssl 1.1.1i
 ::  1.6.0   now delete the CA before import!
 ::  1.6.1   PFX password cannot be blank because of java\keytool
+::  1.6.2   admin detection changed
+::  1.6.3   also produces passwordless server key because of opensource software
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
@@ -72,7 +74,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
 
 
 :init
-set version=1.6.1
+set version=1.6.3
 set author=lderewonko
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
@@ -663,6 +665,9 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:%default_bits_Root% -pas
 
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 
+:: passwordless key is needed for 99% of opensource software including nginx, prometheux, grafana...
+openssl rsa -in %CAServer%.key -passin pass:%PASSWORD_Server% -out %CAServer%.nopass.key
+
 :: view it:
 REM openssl rsa -noout -text -in %CAServer%.key
 goto :EOF
@@ -686,6 +691,9 @@ openssl genpkey -paramfile %CAServer%.param.crt -pass pass:%PASSWORD_Server% -ou
 REM openssl genpkey -algorithm EC -out %CAServer%.key -pkeyopt ec_paramgen_curve:P-%default_ECC_Intermediate% -pkeyopt ec_param_enc:named_curve
 
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
+
+:: passwordless key is needed for 99% of opensource software including nginx, prometheux, grafana...
+openssl rsa -in %CAServer%.key -passin pass:%PASSWORD_Server% -out %CAServer%.nopass.key
 
 :: view it:
 REM openssl ec -noout -text -passin pass:%PASSWORD_Server% -in %CAServer%.key
@@ -899,7 +907,7 @@ IF DEFINED req (
       IF DEFINED AUTOMATED exit
       REM :UACPrompt
       REM net localgroup administrators | findstr "%USERNAME%" >NUL || call :error %~0: User %USERNAME% is NOT localadmin
-      gpresult /R | findstr BUILTIN\Administrators >NUL || call :error %~0: User %USERNAME% is NOT localadmin
+      gpresult /R | findstr BUILTIN\Administrators >NUL || net session >NUL 2>&1 || call :error %~0: User %USERNAME% is NOT localadmin
       echo Set UAC = CreateObject^("Shell.Application"^) >"%TMP%\getadmin.vbs"
       REM :: WARNING: cannot use escaped parameters with this one:
       IF DEFINED params (
