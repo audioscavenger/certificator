@@ -27,7 +27,7 @@ set default_days_Root=7300
 :: We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
 set default_md_Root=sha256
 
-:: Expert constantly predict the end of 1024bit encryption but, as of 2021 it still has not been breaked; using 2048 your security is improved 2^1024 times
+:: Expert constantly predict the end of 1024bit encryption but, as of 2021 it still has not been beached; using 2048 bits over 1024, your security is improved 2^1024 times
 :: https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption
 ::    RSA     ECC
 ::    1024    160
@@ -46,7 +46,7 @@ set default_bits_Root=4096
 ::      NIST-P: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
 ::      SECG  : https://www.secg.org/sec2-v2.pdf
 :: prime256v1                               = X9.62/SECG curve over a 256 bit prime field
-:: containder, without participation of the NSA: Curve25519 - UMAC is much faster than HMAC for message authentication in TLS. see RFC http://www.ietf.org/rfc/rfc4418.txt or http://fastcrypto.org/umac/
+:: contender, without participation of the NSA: Curve25519 - UMAC is much faster than HMAC for message authentication in TLS. see RFC http://www.ietf.org/rfc/rfc4418.txt or http://fastcrypto.org/umac/
 set default_ecc_Root=secp384r1
 
 :: Password for Private keys and certificates, can be blank but should be 20 chars really
