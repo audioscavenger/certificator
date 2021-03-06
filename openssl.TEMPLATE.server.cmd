@@ -104,8 +104,6 @@ set jurisdictionCountryName_Server=US
 REM set serialNumber=1234567890
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-
-
 :: Intermediate policies: OIDs of public policies that apply to your Intermediate CA ---------
 :: To respect the CA Browser EV Guidelines, you must be registered in IANA under https://www.alvestrand.no/objectid/1.3.6.1.4.1.html
 :: Example: Internet Private: 1.3.6.1.4.1.44947.1.1.1 = OID attached to certificates issued by Let's Encrypt.

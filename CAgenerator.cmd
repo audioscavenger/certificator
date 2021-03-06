@@ -432,8 +432,10 @@ IF EXIST %CARoot%.key exit /b 0
 :: https://stackoverflow.com/questions/64961096/what-is-the-suggested-openssl-command-to-generate-ec-key-and-csr-compatible-with
 :: https://www.openssl.org/docs/man1.1.0/man1/genpkey.html
 :: options 1: why you need to store the params: https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations
-openssl ecparam -out %CARoot%.param.crt -name %default_ECC_Root% -param_enc explicit
-openssl genpkey -paramfile %CARoot%.param.crt -pass pass:%PASSWORD_Root% -out %CARoot%.key
+echo %b%  openssl ecparam -out %CARoot%.param.crt -name %default_ECC_Root% -param_enc explicit %END%
+openssl ecparam -out %CARoot%.param.crt -name %default_ECC_Root% -param_enc explicit 
+echo %b%  openssl genpkey -paramfile %CARoot%.param.crt -pass pass:%PASSWORD_Root% -out %CARoot%.key %END%
+openssl genpkey -paramfile %CARoot%.param.crt -pass pass:%PASSWORD_Root% -out %CARoot%.key 
 
 :: options 1b:
 REM openssl genpkey -algorithm EC -out %CARoot%.key -pkeyopt ec_paramgen_curve:P-%default_ECC_Root% -pkeyopt ec_param_enc:named_curve
@@ -464,7 +466,8 @@ echo %HIGH%%b%  certutil -verify -urlfetch %CARoot%.crt %END%
 IF EXIST %CARoot%.crt IF /I NOT "%FORCE_Root%"=="y" exit /b 0
 
 REM -subj: M$ and gg have same group but M$ also has country -subj "/CN=%ORG_Root% Root/OU=%ORG_Root% CA/O=%ORG_Root%"
-openssl req -batch -config %cfgCARoot%.cfg -new -x509 -%default_md_Root% -extensions v3_ca -passin pass:%PASSWORD_Root% -key %CARoot%.key -out %CARoot%.crt -set_serial 0
+echo %b%  openssl req -batch -config %cfgCARoot%.cfg -new -x509 -%default_md_Root% -extensions v3_ca -passin pass:%PASSWORD_Root% -key %CARoot%.key -out %CARoot%.crt -set_serial 0 -days %default_days_Root% %END%
+openssl req -batch -config %cfgCARoot%.cfg -new -x509 -%default_md_Root% -extensions v3_ca -passin pass:%PASSWORD_Root% -key %CARoot%.key -out %CARoot%.crt -set_serial 0 -days %default_days_Root% 
 
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 
