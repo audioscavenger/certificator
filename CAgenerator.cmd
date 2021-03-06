@@ -61,6 +61,7 @@ REM certutil -url %DOMAIN%.crt
 ::  1.6.1   PFX password cannot be blank because of java\keytool
 ::  1.6.2   admin detection changed
 ::  1.6.3   also produces passwordless server key because of opensource software
+::  1.6.4   various bugfixes
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
