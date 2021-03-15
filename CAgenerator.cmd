@@ -64,6 +64,7 @@ REM certutil -url %DOMAIN%.crt
 ::  1.6.4   various bugfixes
 ::  1.6.5   menu improvements
 ::  1.6.6   moved Intermediate under YOURDOMAIN\
+::  1.6.7   bugfix for PFX bundle that was incompatible with java keytool
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
@@ -77,7 +78,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
 
 
 :init
-set version=1.6.6
+set version=1.6.7
 set author=lderewonko
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
