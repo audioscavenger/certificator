@@ -62,6 +62,8 @@ REM certutil -url %DOMAIN%.crt
 ::  1.6.2   admin detection changed
 ::  1.6.3   also produces passwordless server key because of opensource software
 ::  1.6.4   various bugfixes
+::  1.6.5   menu improvements
+::  1.6.6   moved Intermediate under YOURDOMAIN\
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
@@ -75,7 +77,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
 
 
 :init
-set version=1.6.3
+set version=1.6.6
 set author=lderewonko
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
@@ -120,11 +122,21 @@ IF /I "%DEMO%"=="y" goto :main
 set ORG_Root=
 set ORG_Intermediate=%USERDOMAIN%
 set DOMAIN=%USERDNSDOMAIN%
-set /P         ORG_Root=Organisation?  [%ORG_Root%] 
+
+for /F %%a in ('dir /ad /od /b ^| findstr /V "git bin dad magma archive"') DO echo                 %c%%%a%END% & set ORG_Root=%%a
+set /P         ORG_Root=Organisation?  [%HIGH%%c%%ORG_Root%%END%] 
 call %ORG_Root%\openssl.%ORG_Root%.cmd >NUL 2>&1
-set /P ORG_Intermediate=Intermediate?  [%ORG_Intermediate%] 
+
+for /F %%a in ('dir /ad /od /b %ORG_Root%') DO echo                 %c%%%a%END% & set ORG_Intermediate=%%a
+set /P ORG_Intermediate=Intermediate?  [%HIGH%%c%%ORG_Intermediate%%END%] 
 call %ORG_Root%\openssl.%ORG_Intermediate%.cmd >NUL 2>&1
-set /P           DOMAIN=Server DOMAIN? [%DOMAIN%] 
+
+for /F %%a in ('dir /od /b %ORG_Root%\%ORG_Intermediate%\openssl.*.cfg') DO (
+  set set DDOMAIN=
+  echo %%~na | findstr openssl.%ORG_Intermediate% >NUL || set DDOMAIN=%%~na
+  IF DEFINED DDOMAIN call echo                 %%DDOMAIN:~8%% & call set DOMAIN=%%DDOMAIN:~8%%
+)
+set /P           DOMAIN=Server DOMAIN? [%HIGH%%c%%DOMAIN%%END%] 
 call %ORG_Root%\%ORG_Intermediate%\openssl.%DOMAIN%.cmd >NUL 2>&1
 
 :: ENCRYPTION can be different for each section
@@ -203,7 +215,7 @@ echo %c%%~0%END%
 :: we don't provide cfgCAIntermediate to the client the CAServer is for
 :: we do    provide    CAIntermediate to the client the CAServer is for so they can generate more CAServers
 set cfgCARoot=%ORG_Root%\openssl.%ORG_Root%
-set cfgCAIntermediate=%ORG_Root%\openssl.%ORG_Intermediate%
+set cfgCAIntermediate=%ORG_Root%\%ORG_Intermediate%\openssl.%ORG_Intermediate%
 set cfgCAServer=%ORG_Root%\%ORG_Intermediate%\openssl.%DOMAIN%
 set CARoot=%ORG_Root%\ca.%ORG_Root%
 set CAIntermediate=%ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%
@@ -771,11 +783,23 @@ echo %c%%~0%END%
 type %CAServer%.crt %CAIntermediate%.crt %CARoot%.crt >%CAServer%.chain.pem
 
 :: convert chain to PFX for Windows:
-openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PASSWORD_Server% -in %CAServer%.chain.pem -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.chain.pfx
+:: below is INCOMPATIBLE with keytool:
+REM openssl pkcs12 -export -out %CAServer%.chain.pfx -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PASSWORD_Server% -in %CAServer%.chain.pem -passout pass:%PASSWORD_PFX_Server%
+:: below works with keytool: the order in which you add certfile MATTERS: Intermediate, THEN Root!
+openssl pkcs12 -export -out %CAServer%.chain.pfx -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PASSWORD_Server% -in %CAServer%.crt       -passout pass:%PASSWORD_PFX_Server% -certfile %CAIntermediate%.crt -certfile %CARoot%.crt
+
+:: verify it:
+:: openssl always works, that's not proof the pfx is valid
+REM openssl pkcs12 -info -in %CAServer%.chain.pfx -passin pass:%PASSWORD_PFX_Server%
+:: only keytool validation can prove anything!
+REM keytool -list -v -keystore %CAServer%.chain.pfx -storepass %PASSWORD_PFX_Server%
+
+:: convert to JKS - nope, Tomcat can read PKCS12
+REM keytool -importkeystore -srckeystore %CAServer%.chain.pfx -srcstoretype PKCS12 -deststoretype JKS -destkeystore %CAServer%.chain.jks
 
 :: https://stackoverflow.com/questions/9971464/how-to-convert-crt-cetificate-file-to-pfx
 :: CRT + CA: all in one
-REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CARoot%.key -passin pass:%PASSWORD_Root% -in %CAServer%.crt -certfile %CARoot%.crt -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
+REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CAIntermediate%.key -passin pass:%PASSWORD_Intermediate% -in %CAServer%.crt -certfile %CAIntermediate%.crt -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
 
 :: https://www.phildev.net/ssl/creating_ca.html
 REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey %CAServer%.key -passin pass:%PASSWORD_Intermediate% -in %CAServer%.crt -chain -CAfile %CARoot%.crt -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
