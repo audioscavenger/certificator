@@ -65,6 +65,7 @@ REM certutil -url %DOMAIN%.crt
 ::  1.6.5   menu improvements
 ::  1.6.6   moved Intermediate under YOURDOMAIN\
 ::  1.6.7   bugfix for PFX bundle that was incompatible with java keytool
+::  1.6.8   bugfix + verbose for regenerating server cert
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
@@ -78,7 +79,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
 
 
 :init
-set version=1.6.7
+set version=1.6.8
 set author=lderewonko
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
@@ -126,18 +127,26 @@ set DOMAIN=%USERDNSDOMAIN%
 
 for /F %%a in ('dir /ad /od /b ^| findstr /V "git bin dad magma archive"') DO echo                 %c%%%a%END% & set ORG_Root=%%a
 set /P         ORG_Root=Organisation?  [%HIGH%%c%%ORG_Root%%END%] 
+echo ddebug call %ORG_Root%\openssl.%ORG_Root%.cmd
 call %ORG_Root%\openssl.%ORG_Root%.cmd >NUL 2>&1
 
 for /F %%a in ('dir /ad /od /b %ORG_Root%') DO echo                 %c%%%a%END% & set ORG_Intermediate=%%a
 set /P ORG_Intermediate=Intermediate?  [%HIGH%%c%%ORG_Intermediate%%END%] 
+echo ddebug call %ORG_Root%\openssl.%ORG_Intermediate%.cmd
 call %ORG_Root%\openssl.%ORG_Intermediate%.cmd >NUL 2>&1
+
+echo ddebug dir %ORG_Root%\%ORG_Intermediate%\openssl.*.cfg
+dir %ORG_Root%\%ORG_Intermediate%\openssl.*.cfg
 
 for /F %%a in ('dir /od /b %ORG_Root%\%ORG_Intermediate%\openssl.*.cfg') DO (
   set set DDOMAIN=
+  echo ddebug %%%%~na=%%~na
+  echo ddebug %%~na ^| findstr openssl.%ORG_Intermediate% ^|^| set DDOMAIN=%%~na
   echo %%~na | findstr openssl.%ORG_Intermediate% >NUL || set DDOMAIN=%%~na
   IF DEFINED DDOMAIN call echo                 %%DDOMAIN:~8%% & call set DOMAIN=%%DDOMAIN:~8%%
 )
 set /P           DOMAIN=Server DOMAIN? [%HIGH%%c%%DOMAIN%%END%] 
+echo ddebug call %ORG_Root%\%ORG_Intermediate%\openssl.%DOMAIN%.cmd
 call %ORG_Root%\%ORG_Intermediate%\openssl.%DOMAIN%.cmd >NUL 2>&1
 
 :: ENCRYPTION can be different for each section
@@ -286,10 +295,27 @@ goto :EOF
 :init_cmd
 echo %c%%~0%END%
 
+IF EXIST %cfgCARoot%          (echo %g%cfgCARoot=%cfgCARoot%%END%) ELSE echo %r%cfgCARoot=%cfgCARoot%%END%
+IF EXIST %cfgCAIntermediate%  (echo %g%cfg CAIntermediate=%cfgCAIntermediate%%END%) ELSE echo %r%cfg CAIntermediate=%cfgCAIntermediate%%END%
+IF EXIST %cfgCAServer%        (echo %g%cfgCAServer=%cfgCAServer%%END%) ELSE echo %r%cfgCAServer=%cfgCAServer%%END%
+IF EXIST %CARoot%             (echo %g%CARoot=%CARoot%%END%) ELSE echo %r%CARoot=%CARoot%%END%
+IF EXIST %CAIntermediate%     (echo %g%CAIntermediate=%CAIntermediate%%END%) ELSE echo %r%CAIntermediate=%CAIntermediate%%END%
+IF EXIST %CAServer%           (echo %g%CAServer=%CAServer%%END%) ELSE echo %r%CAServer=%CAServer%%END%
+%PAUSE%
+
 IF EXIST %cfgCARoot%.cmd IF EXIST %cfgCAIntermediate%.cmd IF EXIST %cfgCAServer%.cmd exit /b 0
-IF NOT EXIST %cfgCARoot%.cmd          copy openssl.TEMPLATE.Root.cmd          %cfgCARoot%.cmd
-IF NOT EXIST %cfgCAIntermediate%.cmd  copy openssl.TEMPLATE.Intermediate.cmd  %cfgCAIntermediate%.cmd
-IF NOT EXIST %cfgCAServer%.cmd        copy openssl.TEMPLATE.Server.cmd        %cfgCAServer%.cmd
+IF NOT EXIST %cfgCARoot%.cmd          (
+  echo copy openssl.TEMPLATE.Root.cmd          %cfgCARoot%.cmd
+  copy openssl.TEMPLATE.Root.cmd          %cfgCARoot%.cmd
+)
+IF NOT EXIST %cfgCAIntermediate%.cmd  (
+  echo copy openssl.TEMPLATE.Intermediate.cmd  %cfgCAIntermediate%.cmd
+  copy openssl.TEMPLATE.Intermediate.cmd  %cfgCAIntermediate%.cmd
+)
+IF NOT EXIST %cfgCAServer%.cmd        (
+  echo copy openssl.TEMPLATE.Server.cmd        %cfgCAServer%.cmd
+  copy openssl.TEMPLATE.Server.cmd        %cfgCAServer%.cmd
+)
 
 echo:
 echo   %HIGH%Please edit all the %c%%ORG_Root%\*\openssl.*.cmd%w%
