@@ -7,7 +7,7 @@
 
 :: RSA vs ECC is still subject of debate as of 2021.
 :: There is no denial that it's faster and exponentially more secure than rsa
-:: However some ill-developped clients still cannot handle it
+:: However some ill-developped clients including java, still cannot handle it
 set ENCRYPTION=RSA
 
 :: this is your Root CA ORGanisation short name
