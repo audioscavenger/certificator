@@ -141,7 +141,7 @@ set organization=yourCompany Inc.
 
 :: X509v3 CRL Distribution Points:
 :: revocation url: you should serve %ORG_Intermediate%.crl (DER) and %ORG_Intermediate%.crl.crt (PEM) over http at this address:
-set crlDistributionPoints.1=http://pki.yourcompany.com/%ORG_Intermediate%.crl
+set crlDistributionPoints.1=http://yourcompany.com/%ORG_Intermediate%.crl
 
 :: //TODO: CT Precertificate SCTs: https://certificate.transparency.dev/howctworks/
 :: //TODO: CT Precertificate SCTs: https://letsencrypt.org/2018/04/04/sct-encoding.html
