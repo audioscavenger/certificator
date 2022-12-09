@@ -1,36 +1,8 @@
 @echo OFF
 pushd %~dp0
 
-:: Certificate output breakdown: https://www.misterpki.com/openssl-view-certificate/
-REM openssl x509 -text -noout -in 
-REM openssl s_client -showcerts -connect https://www.nqzw.com
-REM openssl s_client -servername  www.nqzw.com -connect www.nqzw.com:443 | sed -ne "/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p" > www.nqzw.com.crt
-REM openssl x509 -text -noout -in www.nqzw.com.crt
-
-:: //TODO: install Microsoft Online Responder Service
-:: https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/cc770413(v=ws.10)?redirectedfrom=MSDN
-:: Create/delete web virtual roots for OCSP web proxy:
-REM certutil -vocsproot delete
-REM certutil -vocsproot
-REM net stop certsvc && net start certsvc && iisreset
-:: CertUtil: -vocsproot command FAILED: 0x80070002 (WIN32: 2 ERROR_FILE_NOT_FOUND)
-:: During Online Responder installation an OCSP virtual directory is created under the Default Web Site in Internet Information Service (IIS), by the command certutil -vocsproot. However, the command will fail if the Default Web Site is missing or has otherwise been reconfigured.
-:: Test ocsp: https://social.technet.microsoft.com/Forums/en-US/25d15b66-d32a-414d-8154-14662d66bdca/urgent-help-needed-about-online-responder?forum=winserversecurity
-REM certutil -url "%DNSDOMAIN%.crt"
-
-:: //TODO: separate CSR from KEY
-:: //TODO: working example = microsoft.com certificate
-:: //TODO: store Server serial.pem in its rightful folder
-
-:: CANCEL:  2-step Ca + *.domain / separate CRT key     https://adfinis.com/en/blog/openssl-x509-certificates/
-:: DONE:    2-step Ca + *.domain / separate CA/CRT keys https://gist.github.com/Dan-Q/4c7108f1e539ee5aefbb53a334320b27
-:: CURRENT: 3-step complete CA + inter + *.domain + client https://blog.behrang.org/articles/creating-a-ca-with-openssl.html
-:: TOTEST:  3-step complete CA/IA/server https://raymii.org/s/tutorials/OpenSSL_command_line_Root_and_Intermediate_CA_including_OCSP_CRL%20and_revocation.html
-:: TOTEST:  3-step complete CA/IA/server https://www.golinuxcloud.com/openssl-create-certificate-chain-linux/
-:: KO:  3-step http://dadhacks.org/2017/12/27/building-a-root-ca-and-an-intermediate-ca-using-openssl-and-debian-stretch/
-:: KO:  3-step https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
-
 ::  1.7.x   TODO: default_days_Root != default_days_Intermediate but generated crt have same duration, why?
+::  1.7.2   cleanup
 ::  1.7.1   rename DOMAIN->DNSDOMAIN + YOURDOMAIN.LOCAL.chain.pfx now really holds all 3 crt + they all install into the correct repository
 ::  1.7.0   now protecting folders with spaces
 ::  1.6.9   now prompting for RESET
@@ -71,6 +43,23 @@ REM certutil -url "%DNSDOMAIN%.crt"
 ::  1.1.1   renamed root folder to just ORG_Root
 ::  1.1.0   separated server csr from key; can regenerate csr
 
+:: Certificate output breakdown: https://www.misterpki.com/openssl-view-certificate/
+REM openssl x509 -text -noout -in 
+REM openssl s_client -showcerts -connect https://www.nqzw.com
+REM openssl s_client -servername  www.nqzw.com -connect www.nqzw.com:443 | sed -ne "/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p" > www.nqzw.com.crt
+REM openssl x509 -text -noout -in www.nqzw.com.crt
+
+:: CANCEL:  2-step Ca + *.domain / separate CRT key     https://adfinis.com/en/blog/openssl-x509-certificates/
+:: DONE:    2-step Ca + *.domain / separate CA/CRT keys https://gist.github.com/Dan-Q/4c7108f1e539ee5aefbb53a334320b27
+:: CURRENT: 3-step complete CA + inter + *.domain + client https://blog.behrang.org/articles/creating-a-ca-with-openssl.html
+:: TOTEST:  3-step complete CA/IA/server https://raymii.org/s/tutorials/OpenSSL_command_line_Root_and_Intermediate_CA_including_OCSP_CRL%20and_revocation.html
+:: TOTEST:  3-step complete CA/IA/server https://www.golinuxcloud.com/openssl-create-certificate-chain-linux/
+:: TOTEST:  ocsp: https://social.technet.microsoft.com/Forums/en-US/25d15b66-d32a-414d-8154-14662d66bdca/urgent-help-needed-about-online-responder?forum=winserversecurity
+:: TOTEST:  ocsp: https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/cc770413(v=ws.10)?redirectedfrom=MSDN
+:: KO:  3-step http://dadhacks.org/2017/12/27/building-a-root-ca-and-an-intermediate-ca-using-openssl-and-debian-stretch/
+:: KO:  3-step https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
+
+
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
 REM call YOURORG\YOURDOMAIN\openssl.YOURDOMAIN.LOCAL.cmd
@@ -83,7 +72,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DNSDOMAIN%
 
 
 :init
-set version=1.6.8
+set version=1.7.2
 set author=lderewonko
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 

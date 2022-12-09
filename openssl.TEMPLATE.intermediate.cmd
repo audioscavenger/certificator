@@ -19,10 +19,11 @@ set DNSDOMAIN=YOURDOMAIN.LOCAL
 
 :::::::::::::::::::::::::::::::::::::
 :: AIA (Authority Information Access): a certificate extension that contains information useful for verifying the trust status of a certificate. 
+:: This is a work in progress, as you will need an OCSP server, however the entry is at least present
 :: authorityInfoAccessCaIssuers = url with issuer CA = not provided for Intermediate
 :: authorityInfoAccessOCSP = Online Certificate Status Protocol (OCSP) responder configured to provide status for the certificate below.
 REM set authorityInfoAccessCaIssuers=yourcompany.com/ca.%ORG_Root%.crt
-set authorityInfoAccessOCSP=yourcompany.com/ocsp/
+set authorityInfoAccessOCSP=server1.yourcompany.com/ocsp/
 :::::::::::::::::::::::::::::::::::::
 
 :: 3650 = 10 years
@@ -30,16 +31,19 @@ set default_days_Intermediate=3650
 
 :: From a security perspective, sha512 is overkill: In practical terms, SHA-256 is just as secure as SHA-384 or SHA-512. 
 :: We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
-set default_md_Intermediate=sha256
+:: Reasons to choose SHA-256 over the longer digests: smaller packets, requiring less bandwidth, less memory and less processing power
+:: Also there are likely compatibility issues, since virtually no one uses certs with SHA-384 or SHA-512, you're far more likely to run into systems that don't understand them
+REM set default_md_Root=sha512
+set default_md_Root=sha256
 
-:: Expert constantly predict the end of 1024bit encryption but, as of 2021 it still has not been beached; using 2048 bits over 1024, your security is improved 2^1024 times
-:: https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption
+:: Expert constantly predict the end of 1024bit encryption but, as of 2022 the 256bit still has not been breached, let alone 512 or 1024.
+:: Using 2048 bits over 1024, your security is improved 2^1024 times. 4096 should only be used for the Root CA.
+:: Comparison of bit size vs effectiveness for RSA vs ECC: https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption
 ::    RSA     ECC
 ::    1024    160
 ::    2048    224
 ::    3072    256
 ::    7680    384
-::    15360   521
 set default_bits_Intermediate=2048
 
 :: https://crypto.stackexchange.com/questions/70889/is-curve-p-384-equal-to-secp384r1?newreg=a86ae3c6cbfd427e94e0a8682450c2cf
@@ -54,9 +58,10 @@ set default_bits_Intermediate=2048
 :: contender, without participation of the NSA: Curve25519 - UMAC is much faster than HMAC for message authentication in TLS. see RFC http://www.ietf.org/rfc/rfc4418.txt or http://fastcrypto.org/umac/
 set default_ecc_Intermediate=secp384r1
 
-:: Password for Private keys and certificates, can be blank but should be 20 chars really
+:: Password for Private keys, can be blank but should be 20 chars really and different from the PFX password
 set PASSWORD_Intermediate=intermediate_key_pass
-:: Password for exported PFX files, can be blank
+:: Password for exported PFX files, should be blank or very simple; it's for deployement on clients
+REM set PASSWORD_PFX_Intermediate=pfx_pass_int
 set PASSWORD_PFX_Intermediate=
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -107,7 +112,7 @@ set policyIdentifier=1.3.6.1.5.5.7.2.1
 :: CPS Point to the Internet Security Research Group (ISRG) Certification Practice Statementer of the CA emiter
 :: that describes the policy under which the certificate in the subject was issued. 
 :: examples: http://cps.letsencrypt.org   http://certificates.godaddy.com/repository/   https://www.digicert.com/legal-repository
-set CPS.1=http://yourcompany.com/cps/
+set CPS.1=http://server1.yourcompany.com/cps/
 
 :: User Notice is a small piece of text (RFC recommends to use no more than 200 characters) that describes particular policy.
 set explicitText=This certificate protects the private data transmitted throught the local domain YOURDOMAIN, own by yourCompany Inc.
@@ -115,7 +120,7 @@ set organization=yourCompany Inc.
 
 :: X509v3 CRL Distribution Points:
 :: revocation url: you should serve ca.%ORG_Intermediate%.crl (DER) and ca.%ORG_Intermediate%.crl.crt (PEM) over http at this address:
-set crlDistributionPoints.1=http://yourcompany.com/ca.%ORG_Intermediate%.crl
+set crlDistributionPoints.1=http://server1.yourcompany.com/ca.%ORG_Intermediate%.crl
 
 :: //TODO: CT Precertificate SCTs: https://certificate.transparency.dev/howctworks/
 :: //TODO: CT Precertificate SCTs: https://letsencrypt.org/2018/04/04/sct-encoding.html
