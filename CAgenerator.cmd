@@ -16,7 +16,7 @@ REM net stop certsvc && net start certsvc && iisreset
 :: CertUtil: -vocsproot command FAILED: 0x80070002 (WIN32: 2 ERROR_FILE_NOT_FOUND)
 :: During Online Responder installation an OCSP virtual directory is created under the Default Web Site in Internet Information Service (IIS), by the command certutil -vocsproot. However, the command will fail if the Default Web Site is missing or has otherwise been reconfigured.
 :: Test ocsp: https://social.technet.microsoft.com/Forums/en-US/25d15b66-d32a-414d-8154-14662d66bdca/urgent-help-needed-about-online-responder?forum=winserversecurity
-REM certutil -url "%DOMAIN%.crt"
+REM certutil -url "%DNSDOMAIN%.crt"
 
 :: //TODO: separate CSR from KEY
 :: //TODO: working example = microsoft.com certificate
@@ -30,6 +30,8 @@ REM certutil -url "%DOMAIN%.crt"
 :: KO:  3-step http://dadhacks.org/2017/12/27/building-a-root-ca-and-an-intermediate-ca-using-openssl-and-debian-stretch/
 :: KO:  3-step https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
 
+::  1.7.x   TODO: default_days_Root != default_days_Intermediate but generated crt have same duration, why?
+::  1.7.1   rename DOMAIN->DNSDOMAIN + YOURDOMAIN.LOCAL.chain.pfx now really holds all 3 crt + they all install into the correct repository
 ::  1.7.0   now protecting folders with spaces
 ::  1.6.9   now prompting for RESET
 ::  1.6.8   bugfix + verbose for regenerating server cert
@@ -71,13 +73,13 @@ REM certutil -url "%DOMAIN%.crt"
 
 REM call YOURORG\openssl.YOURORG.cmd
 REM call YOURORG\openssl.YOURDOMAIN.cmd
-REM call YOURORG\YOURDOMAIN\openssl.INTERNAL.YOURDOMAIN.LOCAL.cmd
+REM call YOURORG\YOURDOMAIN\openssl.YOURDOMAIN.LOCAL.cmd
 REM set cfgCARoot=%ORG_Root%\openssl.%ORG_Root%
 REM set cfgCAIntermediate=%ORG_Root%\openssl.%ORG_Intermediate%
-REM set cfgCAServer=%ORG_Root%\%ORG_Intermediate%\openssl.%DOMAIN%
+REM set cfgCAServer=%ORG_Root%\%ORG_Intermediate%\openssl.%DNSDOMAIN%
 REM set CARoot=%ORG_Root%\ca.%ORG_Root%
 REM set CAIntermediate=%ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%
-REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
+REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DNSDOMAIN%
 
 
 :init
@@ -108,10 +110,10 @@ where openssl >NUL 2>&1 || set "PATH=%~dp0bin;%PATH%"
 where openssl >NUL 2>&1 || call :error openssl not found under %~dp0bin
 
 call :check_exist_exit openssl.TEMPLATE.root.cfg
-call :check_exist_exit openssl.TEMPLATE.intermediate.cfg
-call :check_exist_exit openssl.TEMPLATE.server.cfg
 call :check_exist_exit openssl.TEMPLATE.root.cmd
+call :check_exist_exit openssl.TEMPLATE.intermediate.cfg
 call :check_exist_exit openssl.TEMPLATE.intermediate.cmd
+call :check_exist_exit openssl.TEMPLATE.server.cfg
 call :check_exist_exit openssl.TEMPLATE.server.cmd
 
 
@@ -120,15 +122,15 @@ call :check_exist_exit openssl.TEMPLATE.server.cmd
 set ENCRYPTION=RSA
 set ORG_Root_DEMO=YOURORG
 set ORG_Intermediate_DEMO=YOURDOMAIN
-set DOMAIN_DEMO=INTERNAL.YOURDOMAIN.LOCAL
+set DOMAIN_DEMO=YOURDOMAIN.LOCAL
 
 set ORG_Root=%ORG_Root_DEMO%
 set ORG_Intermediate=%ORG_Intermediate_DEMO%
-set DOMAIN=%DOMAIN_DEMO%
+set DNSDOMAIN=%DOMAIN_DEMO%
 IF /I "%DEMO%"=="y" goto :main
 
 set ORG_Intermediate=%USERDOMAIN%
-set DOMAIN=%USERDNSDOMAIN%
+set DNSDOMAIN=%USERDNSDOMAIN%
 
 set ORG_Root_found=
 for /F %%a in ('dir /ad /od /b ^| findstr /V "git bin dad magma archive" 2^>NUL') DO set ORG_Root_found=%%a
@@ -147,17 +149,17 @@ for /F %%a in ('dir /od /b %ORG_Root%\%ORG_Intermediate%\openssl.*.cfg 2^>NUL') 
   echo ddebug %%%%~na=%%~na
   echo ddebug %%~na ^| findstr openssl.%ORG_Intermediate% ^|^| set DDOMAIN=%%~na
   echo %%~na | findstr openssl.%ORG_Intermediate% >NUL || set DDOMAIN=%%~na
-  IF DEFINED DDOMAIN call echo                 %%DDOMAIN:~8%% & call set DOMAIN=%%DDOMAIN:~8%%
+  IF DEFINED DDOMAIN call echo                 %%DDOMAIN:~8%% & call set DNSDOMAIN=%%DDOMAIN:~8%%
 )
-set /P           DOMAIN=Server DOMAIN? [%HIGH%%c%%DOMAIN%%END%] 
-IF /I "%RESET%"=="n" call %ORG_Root%\%ORG_Intermediate%\openssl.%DOMAIN%.cmd >NUL 2>&1
+set /P           DNSDOMAIN=Server DNSDOMAIN? [%HIGH%%c%%DNSDOMAIN%%END%] 
+IF /I "%RESET%"=="n" call %ORG_Root%\%ORG_Intermediate%\openssl.%DNSDOMAIN%.cmd >NUL 2>&1
 
 :: ENCRYPTION can be different for each section
 REM set /P       ENCRYPTION=RSA or ECC?    [%ENCRYPTION%] 
 
 IF NOT DEFINED ORG_Root         call :error Organisation is required
 IF NOT DEFINED ORG_Intermediate call :error Intermediate is required
-IF NOT DEFINED DOMAIN           call :error DOMAIN is required
+IF NOT DEFINED DNSDOMAIN           call :error DNSDOMAIN is required
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :main
@@ -229,10 +231,10 @@ echo %c%%~0%END%
 :: we do    provide    CAIntermediate to the client the CAServer is for so they can generate more CAServers
 set cfgCARoot=%ORG_Root%\openssl.%ORG_Root%
 set cfgCAIntermediate=%ORG_Root%\%ORG_Intermediate%\openssl.%ORG_Intermediate%
-set cfgCAServer=%ORG_Root%\%ORG_Intermediate%\openssl.%DOMAIN%
+set cfgCAServer=%ORG_Root%\%ORG_Intermediate%\openssl.%DNSDOMAIN%
 set CARoot=%ORG_Root%\ca.%ORG_Root%
 set CAIntermediate=%ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%
-set CAServer=%ORG_Root%\%ORG_Intermediate%\%DOMAIN%
+set CAServer=%ORG_Root%\%ORG_Intermediate%\%DNSDOMAIN%
 
 :: OPENSSL_CONF must have full path, and extension cfg on Windows. don't ask me why.
 :: we don't use it anymore because we need to pass config directly to each command
@@ -358,7 +360,7 @@ REM )
 
 :: TODO: handle Firm names with "&" ...
 powershell -executionPolicy bypass -Command ^(Get-Content %1^) ^| Foreach-Object { ^
-    $_ -replace '{DOMAIN}', '%DOMAIN%' `^
+    $_ -replace '{DNSDOMAIN}', '%DNSDOMAIN%' `^
        -replace '{ORG_Root}', '%ORG_Root%' `^
        -replace '{ORG_Intermediate}', '%ORG_Intermediate%' `^
        -replace '{ORG_Server}', '%ORG_Server%' `^
@@ -659,6 +661,15 @@ type "%CAIntermediate%.crt" "%CARoot%.crt" >"%CAIntermediate%.chain.pem"
 IF DEFINED VERBOSE echo openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey "%CAIntermediate%.key" -passin pass:%PASSWORD_Intermediate% -in "%CAIntermediate%.chain.pem" -passout pass:%PASSWORD_PFX_Intermediate% -out "%CAIntermediate%.chain.pfx"
 openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey "%CAIntermediate%.key" -passin pass:%PASSWORD_Intermediate% -in "%CAIntermediate%.chain.pem" -passout pass:%PASSWORD_PFX_Intermediate% -out "%CAIntermediate%.chain.pfx"
 
+REM :: 4.8, int goes in \Root
+REM openssl pkcs12 -export -name "DDRS RSA TLS CA" -inkey "ca.DDRS.key" -passin pass:DDRS.ORG -in "ca.DDRS.chain.pem" -passout pass:1234567890 -out "ca.DDRS.2.chain.pfx" 
+REM :: 3.3k
+REM openssl pkcs12 -export -name "DDRS RSA TLS CA" -inkey "ca.DDRS.key" -passin pass:DDRS.ORG -in "ca.DDRS.crt" -passout pass:1234567890 -out "ca.DDRS.chain.3.pfx" 
+REM :: 4.8k
+REM openssl pkcs12 -export -name "DDRS RSA TLS CA" -inkey "ca.DDRS.key" -passin pass:DDRS.ORG -in "ca.DDRS.crt" -chain -CAfile "..\ca.Dudnick.crt" -passout pass:1234567890 -out "ca.DDRS.chain.4.pfx" 
+REM :: 6.3k, int goes in \My
+REM openssl pkcs12 -export -name "DDRS RSA TLS CA" -inkey "ca.DDRS.key" -passin pass:DDRS.ORG -in "ca.DDRS.chain.pem" -chain -CAfile "..\ca.Dudnick.crt" -passout pass:1234567890 -out "ca.DDRS.chain.5.pfx" 
+
 :: https://www.phildev.net/ssl/creating_ca.html
 REM openssl pkcs12 -export -name "%ORG_Intermediate% RSA TLS CA" -inkey "%CAIntermediate%.key" -passin pass:%PASSWORD_Intermediate% -in "%CAIntermediate%.crt" -chain -CAfile "%CARoot%.crt" -passout pass:%PASSWORD_PFX_Intermediate% -out "%CAIntermediate%.chain.pfx"
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
@@ -666,10 +677,13 @@ IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 :: list them:
 REM powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My -Recurse ^| Format-Table Thumbprint, Subject ^| 
 
-echo @pushd %%~dp0 >"%CAIntermediate%.chain.pfx".cmd
+echo @echo OFF >"%CAIntermediate%.chain.pfx".cmd
+echo @pushd %%~dp0 >>"%CAIntermediate%.chain.pfx".cmd
 echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\Root -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Root%*'} ^^^| Remove-Item  >>"%CAIntermediate%.chain.pfx".cmd
-echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\CA -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Intermediate%*'} ^^^| Remove-Item  >>"%CAIntermediate%.chain.pfx".cmd
+echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\Root -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Intermediate%*'} ^^^| Remove-Item  >>"%CAIntermediate%.chain.pfx".cmd
+echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\CA   -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Intermediate%*'} ^^^| Remove-Item  >>"%CAIntermediate%.chain.pfx".cmd
 echo certutil -importPFX -f -p "%PASSWORD_PFX_Intermediate%" ca.%ORG_Intermediate%.chain.pfx >>"%CAIntermediate%.chain.pfx".cmd
+echo timeout /t 10 >>"%CAIntermediate%.chain.pfx".cmd
 
 IF DEFINED VERBOSE echo type "%CAIntermediate%.chain.pfx".cmd
 IF DEFINED VERBOSE type "%CAIntermediate%.chain.pfx".cmd
@@ -719,7 +733,7 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:%default_bits_Root% -pas
 
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 
-:: passwordless key is needed for 99% of opensource software including nginx, prometheux, grafana...
+:: 2020: passwordless key is needed for 99% of opensource software including nginx, prometheux, grafana... in 2022 not sure
 IF DEFINED VERBOSE echo openssl rsa -in "%CAServer%.key" -passin pass:%PASSWORD_Server% -out "%CAServer%.nopass.key"
 openssl rsa -in "%CAServer%.key" -passin pass:%PASSWORD_Server% -out "%CAServer%.nopass.key"
 
@@ -828,11 +842,22 @@ IF DEFINED VERBOSE echo type "%CAServer%.crt" "%CAIntermediate%.crt" "%CARoot%.c
 type "%CAServer%.crt" "%CAIntermediate%.crt" "%CARoot%.crt" >"%CAServer%.chain.pem"
 
 :: convert chain to PFX for Windows:
-:: below is INCOMPATIBLE with keytool:
-REM openssl pkcs12 -export -out "%CAServer%.chain.pfx" -name "*.%DOMAIN%" -inkey "%CAServer%.key" -passin pass:%PASSWORD_Server% -in "%CAServer%.chain.pem" -passout pass:%PASSWORD_PFX_Server%
+:: methode 1: 9.4k, this pfx has all 3! However is INCOMPATIBLE with keytool, but what for? I forgot.
+:: We use keytool to import the crt not the pfx. And openssl to convert pfx to crt if needed. So what is the pronlem? no idea.
+IF DEFINED VERBOSE echo openssl pkcs12 -export -name "*.%DNSDOMAIN%" -out "%CAServer%.chain.pfx" -inkey "%CAServer%.key" -passin pass:%PASSWORD_Server% -in "%CAServer%.chain.pem"       -passout pass:%PASSWORD_PFX_Server% -certfile "%CAIntermediate%.crt" -certfile "%CARoot%.crt"
+openssl pkcs12 -export -name "*.%DNSDOMAIN%" -out "%CAServer%.chain.pfx" -inkey "%CAServer%.key" -passin pass:%PASSWORD_Server% -in "%CAServer%.chain.pem"       -passout pass:%PASSWORD_PFX_Server% -certfile "%CAIntermediate%.crt" -certfile "%CARoot%.crt"
 :: below works with keytool: the order in which you add certfile MATTERS: Intermediate, THEN Root!
-IF DEFINED VERBOSE echo openssl pkcs12 -export -out "%CAServer%.chain.pfx" -name "*.%DOMAIN%" -inkey "%CAServer%.key" -passin pass:%PASSWORD_Server% -in "%CAServer%.crt"       -passout pass:%PASSWORD_PFX_Server% -certfile "%CAIntermediate%.crt" -certfile "%CARoot%.crt"
-openssl pkcs12 -export -out "%CAServer%.chain.pfx" -name "*.%DOMAIN%" -inkey "%CAServer%.key" -passin pass:%PASSWORD_Server% -in "%CAServer%.crt"       -passout pass:%PASSWORD_PFX_Server% -certfile "%CAIntermediate%.crt" -certfile "%CARoot%.crt"
+:: methode 2: 6.2k, this pfx has only server crt, even tho we do include Int and CA, very strange.
+REM IF DEFINED VERBOSE echo openssl pkcs12 -export -name "*.%DNSDOMAIN%" -out "%CAServer%.chain.pfx" -inkey "%CAServer%.key" -passin pass:%PASSWORD_Server% -in "%CAServer%.crt"       -passout pass:%PASSWORD_PFX_Server% -certfile "%CAIntermediate%.crt" -certfile "%CARoot%.crt"
+REM openssl pkcs12 -export -name "*.%DNSDOMAIN%" -out "%CAServer%.chain.pfx" -inkey "%CAServer%.key" -passin pass:%PASSWORD_Server% -in "%CAServer%.crt"       -passout pass:%PASSWORD_PFX_Server% -certfile "%CAIntermediate%.crt" -certfile "%CARoot%.crt"
+
+
+:: this pfx has both CA and Int
+REM openssl pkcs12 -export -name "DDRS RSA TLS CA" -inkey "ca.DDRS.key"  -passin pass:DDRS.ORG -in "ca.DDRS.chain.pem"  -out "ca.DDRS.chain.2.pfx"  -passout pass:1234567890 
+:: 6.2k, this pfx has only server
+REM openssl pkcs12 -export -name "*.DDRS.ORG"      -inkey "DDRS.ORG.key" -passin pass:DDRS.ORG -in "DDRS.ORG.crt"       -out "DDRS.ORG.chain.2.pfx" -passout pass:1234567890 -certfile "ca.DDRS.crt" -certfile "..\ca.Dudnick.crt" 
+:: 9.4k, this pfx has all 3!
+REM openssl pkcs12 -export -name "*.DDRS.ORG"      -inkey "DDRS.ORG.key" -passin pass:DDRS.ORG -in "DDRS.ORG.chain.pem" -out "DDRS.ORG.chain.3.pfx" -passout pass:1234567890 -certfile "ca.DDRS.crt" -certfile "..\ca.Dudnick.crt" 
 
 :: verify it:
 :: openssl always works, that's not proof the pfx is valid
@@ -845,28 +870,30 @@ REM keytool -importkeystore -srckeystore "%CAServer%.chain.pfx" -srcstoretype PK
 
 :: https://stackoverflow.com/questions/9971464/how-to-convert-crt-cetificate-file-to-pfx
 :: CRT + CA: all in one
-REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey "%CAIntermediate%.key" -passin pass:%PASSWORD_Intermediate% -in "%CAServer%.crt" -certfile "%CAIntermediate%.crt" -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
+REM openssl pkcs12 -export -name "*.%DNSDOMAIN%" -inkey "%CAIntermediate%.key" -passin pass:%PASSWORD_Intermediate% -in "%CAServer%.crt" -certfile "%CAIntermediate%.crt" -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
 
 :: https://www.phildev.net/ssl/creating_ca.html
-REM openssl pkcs12 -export -name "*.%DOMAIN%" -inkey "%CAServer%.key" -passin pass:%PASSWORD_Intermediate% -in "%CAServer%.crt" -chain -CAfile "%CARoot%.crt" -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
+REM openssl pkcs12 -export -name "*.%DNSDOMAIN%" -inkey "%CAServer%.key" -passin pass:%PASSWORD_Intermediate% -in "%CAServer%.crt" -chain -CAfile "%CARoot%.crt" -passout pass:%PASSWORD_PFX_Server% -out %CAServer%.pfx
 IF %ERRORLEVEL% NEQ 0 echo %r%      ---error---%END% & pause & exit 1
 
 :: list them:
 REM powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My -Recurse ^| Format-Table Thumbprint, FriendlyName
 
-echo @pushd %%~dp0 >"%CAServer%.chain.pfx".cmd
+echo @echo OFF >"%CAServer%.chain.pfx".cmd
+echo @pushd %%~dp0 >>"%CAServer%.chain.pfx".cmd
 echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\Root -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Root%*'} ^^^| Remove-Item  >>"%CAServer%.chain.pfx".cmd
-echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\CA -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Intermediate%*'} ^^^| Remove-Item  >>"%CAServer%.chain.pfx".cmd
-echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My -Recurse ^^^| Get-ChildItem ^^^| where {$_.FriendlyName -like '*.%DOMAIN%'} ^^^| Remove-Item  >>"%CAServer%.chain.pfx".cmd
-echo certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %DOMAIN%.chain.pfx >>"%CAServer%.chain.pfx".cmd
-echo certutil -verify -urlfetch "%DOMAIN%.crt" >>"%CAServer%.chain.pfx".cmd
+echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\Root -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Intermediate%*'} ^^^| Remove-Item  >>"%CAServer%.chain.pfx".cmd
+echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\CA   -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Intermediate%*'} ^^^| Remove-Item  >>"%CAServer%.chain.pfx".cmd
+echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My   -Recurse ^^^| Get-ChildItem ^^^| where {$_.FriendlyName -like '*.%DNSDOMAIN%'} ^^^| Remove-Item  >>"%CAServer%.chain.pfx".cmd
+echo certutil -importPFX -f -p "%PASSWORD_PFX_Server%" %DNSDOMAIN%.chain.pfx >>"%CAServer%.chain.pfx".cmd
+echo certutil -verify -urlfetch "%DNSDOMAIN%.crt" >>"%CAServer%.chain.pfx".cmd
 echo: >>"%CAServer%.chain.pfx".cmd
-echo certutil -dump "%DOMAIN%.crt" ^| findstr /b /c:"Cert Hash(sha1)" ^| for /f "tokens=3" %%%%t in ('more') do for /f "usebackq delims=" %%%%I in (`powershell "\"%%%%t\".toUpper()"`) do @echo %c%THUMBPRINT =%END% %%%%~I >>"%CAServer%.chain.pfx".cmd
+echo certutil -dump "%DNSDOMAIN%.crt" ^| findstr /b /c:"Cert Hash(sha1)" ^| for /f "tokens=3" %%%%t in ('more') do for /f "usebackq delims=" %%%%I in (`powershell "\"%%%%t\".toUpper()"`) do @echo %c%THUMBPRINT =%END% %%%%~I >>"%CAServer%.chain.pfx".cmd
 echo: >>"%CAServer%.chain.pfx".cmd
 echo echo How to revoque IR5 certificates: >>"%CAServer%.chain.pfx".cmd
 echo echo netsh http delete sslcert ipport=0.0.0.0:8085 >>"%CAServer%.chain.pfx".cmd
 echo echo netsh http delete sslcert ipport=0.0.0.0:8086 >>"%CAServer%.chain.pfx".cmd
-echo pause >>"%CAServer%.chain.pfx".cmd
+echo timeout /t 10 >>"%CAServer%.chain.pfx".cmd
 
 IF DEFINED VERBOSE echo type "%CAServer%.chain.pfx".cmd
 IF DEFINED VERBOSE type "%CAServer%.chain.pfx".cmd
@@ -993,10 +1020,8 @@ REM net session  >NUL 2>&1 && set "ADMIN=0" || set "ADMIN=1"
 reg add hklm /f>nul 2>&1 && set "ADMIN=0" || set "ADMIN=1"
 IF %ADMIN% EQU 0 (
   echo Batch started with ADMIN rights 1>&2
-  echo Batch started with ADMIN rights >>%LOG%
 ) ELSE (
   echo Batch started with USER rights 1>&2
-  echo Batch started with USER rights >>%LOG%
 )
 
 IF DEFINED req (
@@ -1106,3 +1131,12 @@ goto :EOF
 echo ----------------------------- THE END -----------------------------
 pause
 exit 0
+
+
+REM https://learn.microsoft.com/en-us/windows/win32/seccrypto/system-store-locations
+REM For each system store location, the predefined systems stores are:
+REM server:       LocalMachine\MY       .Default
+REM CA:           LocalMachine\Root     .Default.LocalMachine
+REM ?:            LocalMachine\Trust    .Default.GroupPolicy
+REM intermediate: LocalMachine\CA       .Default.GroupPolicy
+

@@ -15,22 +15,18 @@ set ORG_Root=YOURORG
 :: this is your Intermediate ORGanisation short name and could be = to %USERDOMAIN%
 set ORG_Intermediate=YOURDOMAIN
 :: this is your Server short name, used for filenames and could be = to %USERDNSDOMAIN%
-set DOMAIN=INTERNAL.YOURDOMAIN.LOCAL
+set DNSDOMAIN=YOURDOMAIN.LOCAL
 
 :: [alt_names] section, enter a list of domains to cover; there is no limit
 :: You can add short machine names, IP addresses, and wildcard domains
 :: Simply increment the DNS.{num} of the variable to add more domains
 :: Delete the lines you do not need starting from the bottom
 :: You cannot use IP ranges https://security.stackexchange.com/questions/91368/ip-range-in-ssl-subject-alternative-name
-set DNS.1=*.INTERNAL.YOURDOMAIN.LOCAL
-set DNS.2=server-cc
-set DNS.3=server-ep-2
-set DNS.4=server-ir5
-set DNS.5=server-pa
+set DNS.1=*.YOURDOMAIN.LOCAL
+set DNS.2=server1
+set DNS.3=server
 set IP.1=10.1.13.12
 set IP.2=10.1.13.121
-set IP.3=10.1.13.95
-set IP.4=10.1.13.97
 
 :::::::::::::::::::::::::::::::::::::
 :: AIA (Authority Information Access): a certificate extension that contains information useful for verifying the trust status of a certificate. 
@@ -83,7 +79,7 @@ set organizationName_Server=yourCompany Inc.
 set organizationalUnitName_Server=YOURDOMAIN
 :: Subject Common Name Field: subject:commonName (OID:  2.5.4.3)
 :: Required/Optional:   Required for a Server certificate
-set commonName_Server=*.INTERNAL.YOURDOMAIN.LOCAL
+set commonName_Server=*.YOURDOMAIN.LOCAL
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: EV Browser part
 set stateOrProvinceName_Server=Arizona
 set localityName_Server=Phoenix

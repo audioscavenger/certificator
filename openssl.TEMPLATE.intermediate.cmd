@@ -15,7 +15,7 @@ set ORG_Root=YOURORG
 :: this is your Intermediate ORGanisation short name and could be = to %USERDOMAIN%
 set ORG_Intermediate=YOURDOMAIN
 :: this is your Server short name, used for filenames and could be = to %USERDNSDOMAIN%
-set DOMAIN=INTERNAL.YOURDOMAIN.LOCAL
+set DNSDOMAIN=YOURDOMAIN.LOCAL
 
 :::::::::::::::::::::::::::::::::::::
 :: AIA (Authority Information Access): a certificate extension that contains information useful for verifying the trust status of a certificate. 
