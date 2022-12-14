@@ -73,7 +73,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DNSDOMAIN%
 
 
 :init
-set version=1.7.2
+set version=1.7.3
 set author=lderewonko
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
