@@ -2,6 +2,7 @@
 pushd %~dp0
 
 ::  1.7.x   TODO: default_days_Root != default_days_Intermediate but generated crt have same duration, why?
+::  1.7.3   bugfix
 ::  1.7.2   cleanup
 ::  1.7.1   rename DOMAIN->DNSDOMAIN + YOURDOMAIN.LOCAL.chain.pfx now really holds all 3 crt + they all install into the correct repository
 ::  1.7.0   now protecting folders with spaces
@@ -135,8 +136,6 @@ IF /I "%RESET%"=="n" call %ORG_Root%\openssl.%ORG_Intermediate%.cmd >NUL 2>&1
 
 for /F %%a in ('dir /od /b %ORG_Root%\%ORG_Intermediate%\openssl.*.cfg 2^>NUL') DO (
   set set DDOMAIN=
-  echo ddebug %%%%~na=%%~na
-  echo ddebug %%~na ^| findstr openssl.%ORG_Intermediate% ^|^| set DDOMAIN=%%~na
   echo %%~na | findstr openssl.%ORG_Intermediate% >NUL || set DDOMAIN=%%~na
   IF DEFINED DDOMAIN call echo                 %%DDOMAIN:~8%% & call set DNSDOMAIN=%%DDOMAIN:~8%%
 )

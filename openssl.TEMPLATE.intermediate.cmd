@@ -33,8 +33,8 @@ set default_days_Intermediate=3650
 :: We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
 :: Reasons to choose SHA-256 over the longer digests: smaller packets, requiring less bandwidth, less memory and less processing power
 :: Also there are likely compatibility issues, since virtually no one uses certs with SHA-384 or SHA-512, you're far more likely to run into systems that don't understand them
-REM set default_md_Root=sha512
-set default_md_Root=sha256
+REM set default_md_Intermediate=sha512
+set default_md_Intermediate=sha256
 
 :: Expert constantly predict the end of 1024bit encryption but, as of 2022 the 256bit still has not been breached, let alone 512 or 1024.
 :: Using 2048 bits over 1024, your security is improved 2^1024 times. 4096 should only be used for the Root CA.
@@ -73,7 +73,7 @@ set organizationName_Intermediate=yourCompany Inc.
 set organizationalUnitName_Intermediate=YOURDOMAIN
 :: Subject Common Name Field: subject:commonName (OID:  2.5.4.3)
 :: Required/Optional:   Deprecated (Discouraged, but not prohibited)
-set commonName_Intermediate=yourCompany RSA TLS CA
+set commonName_Intermediate=yourCompany RSA TLS Intermediate
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :: emailProtection domains that the Intermediate allows the Server to work with:

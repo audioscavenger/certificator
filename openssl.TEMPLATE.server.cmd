@@ -43,8 +43,8 @@ set default_days_Server=3650
 :: We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
 :: Reasons to choose SHA-256 over the longer digests: smaller packets, requiring less bandwidth, less memory and less processing power
 :: Also there are likely compatibility issues, since virtually no one uses certs with SHA-384 or SHA-512, you're far more likely to run into systems that don't understand them
-REM set default_md_Root=sha512
-set default_md_Root=sha256
+REM set default_md_Server=sha512
+set default_md_Server=sha256
 
 :: Expert constantly predict the end of 1024bit encryption but, as of 2022 the 256bit still has not been breached, let alone 512 or 1024.
 :: Using 2048 bits over 1024, your security is improved 2^1024 times. 4096 should only be used for the Root CA.
