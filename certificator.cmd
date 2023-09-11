@@ -2,6 +2,7 @@
 pushd %~dp0
 
 ::  1.7.x   TODO: default_days_Root != default_days_Intermediate but generated crt have same duration, why?
+::  1.7.4   renamed all intermediate CA to int.*
 ::  1.7.3   bugfix
 ::  1.7.2   cleanup
 ::  1.7.1   rename DOMAIN->DNSDOMAIN + YOURDOMAIN.LOCAL.chain.pfx now really holds all 3 crt + they all install into the correct repository
@@ -68,12 +69,12 @@ REM set cfgCARoot=%ORG_Root%\openssl.%ORG_Root%
 REM set cfgCAIntermediate=%ORG_Root%\openssl.%ORG_Intermediate%
 REM set cfgCAServer=%ORG_Root%\%ORG_Intermediate%\openssl.%DNSDOMAIN%
 REM set CARoot=%ORG_Root%\ca.%ORG_Root%
-REM set CAIntermediate=%ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%
+REM set CAIntermediate=%ORG_Root%\%ORG_Intermediate%\int.%ORG_Intermediate%
 REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DNSDOMAIN%
 
 
 :init
-set version=1.7.3
+set version=1.7.4
 set author=lderewonko
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
@@ -221,7 +222,7 @@ set cfgCARoot=%ORG_Root%\openssl.%ORG_Root%
 set cfgCAIntermediate=%ORG_Root%\%ORG_Intermediate%\openssl.%ORG_Intermediate%
 set cfgCAServer=%ORG_Root%\%ORG_Intermediate%\openssl.%DNSDOMAIN%
 set CARoot=%ORG_Root%\ca.%ORG_Root%
-set CAIntermediate=%ORG_Root%\%ORG_Intermediate%\ca.%ORG_Intermediate%
+set CAIntermediate=%ORG_Root%\%ORG_Intermediate%\int.%ORG_Intermediate%
 set CAServer=%ORG_Root%\%ORG_Intermediate%\%DNSDOMAIN%
 
 :: OPENSSL_CONF must have full path, and extension cfg on Windows. don't ask me why.
@@ -516,6 +517,9 @@ openssl x509 -text -noout -in "%CARoot%.crt"
 IF DEFINED VERBOSE echo certutil -verify -urlfetch "%CARoot%.crt"
 certutil -verify -urlfetch "%CARoot%.crt"
 
+:: convert it to PEM:
+openssl x509 -in "%CARoot%.crt" -out "%CARoot%.pem"
+
 goto :EOF
 
 
@@ -635,6 +639,9 @@ IF DEFINED VERBOSE echo certutil -verify -urlfetch "%CAIntermediate%.crt"
 certutil -verify -urlfetch "%CAIntermediate%.crt"
 REM openssl verify -CAfile "%CARoot%.crt" "%CAIntermediate%.crt"
 
+:: convert it to PEM:
+openssl x509 -in "%CAIntermediate%.crt" -out "%CAIntermediate%.pem"
+
 goto :EOF
 
 
@@ -670,7 +677,7 @@ echo @pushd %%~dp0 >>"%CAIntermediate%.chain.pfx".cmd
 echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\Root -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Root%*'} ^^^| Remove-Item  >>"%CAIntermediate%.chain.pfx".cmd
 echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\Root -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Intermediate%*'} ^^^| Remove-Item  >>"%CAIntermediate%.chain.pfx".cmd
 echo powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\CA   -Recurse ^^^| Get-ChildItem ^^^| where {$_.Subject -like 'CN=%commonName_Intermediate%*'} ^^^| Remove-Item  >>"%CAIntermediate%.chain.pfx".cmd
-echo certutil -importPFX -f -p "%PASSWORD_PFX_Intermediate%" ca.%ORG_Intermediate%.chain.pfx >>"%CAIntermediate%.chain.pfx".cmd
+echo certutil -importPFX -f -p "%PASSWORD_PFX_Intermediate%" int.%ORG_Intermediate%.chain.pfx >>"%CAIntermediate%.chain.pfx".cmd
 echo timeout /t 10 >>"%CAIntermediate%.chain.pfx".cmd
 
 IF DEFINED VERBOSE echo type "%CAIntermediate%.chain.pfx".cmd

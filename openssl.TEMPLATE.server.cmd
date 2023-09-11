@@ -32,8 +32,8 @@ set IP.2=10.0.0.12
 :: AIA (Authority Information Access): a certificate extension that contains information useful for verifying the trust status of a certificate. 
 :: authorityInfoAccessCaIssuers = url with issuer CA = Intermediate in this case
 :: authorityInfoAccessOCSP = Online Certificate Status Protocol (OCSP) responder configured to provide status for the certificate below.
-set authorityInfoAccessCaIssuers=server1.yourcompany.com/repository/ca.%ORG_Intermediate%.crt
-set authorityInfoAccessOCSP=server1.yourcompany.com/ocsp/
+set authorityInfoAccessCaIssuers=server1.yourcompany.com/ssl/int.%ORG_Intermediate%.crt
+set authorityInfoAccessOCSP=server1.yourcompany.com/ssl/ocsp/
 :::::::::::::::::::::::::::::::::::::
 
 :: 3650 = 10 years
@@ -136,15 +136,15 @@ set policyIdentifier=1.3.6.1.5.5.7.2.1
 :: CPS Point to the Internet Security Research Group (ISRG) Certification Practice Statementer of the CA emiter
 :: that describes the policy under which the certificate in the subject was issued. 
 :: examples: http://cps.letsencrypt.org   http://certificates.godaddy.com/repository/   https://www.digicert.com/legal-repository
-set CPS.1=http://server1.yourcompany.com/cps/
+set CPS.1=http://server1.yourcompany.com/ssl/cps/
 
 :: User Notice is a small piece of text (RFC recommends to use no more than 200 characters) that describes particular policy.
 set explicitText=This certificate protects the private data transmitted throught the local domain YOURDOMAIN, own by yourCompany Inc.
 set organization=yourCompany Inc.
 
 :: X509v3 CRL Distribution Points:
-:: revocation url: you should serve ca.%ORG_Intermediate%.crl (DER) and ca.%ORG_Intermediate%.crl.crt (PEM) over http at this address:
-set crlDistributionPoints.1=http://server1.yourcompany.com/ca.%ORG_Intermediate%.crl
+:: revocation url: you should serve int.%ORG_Intermediate%.crl (DER) and int.%ORG_Intermediate%.crl.crt (PEM) over http at this address:
+set crlDistributionPoints.1=http://server1.yourcompany.com/int.%ORG_Intermediate%.crl
 
 :: //TODO: CT Precertificate SCTs: https://certificate.transparency.dev/howctworks/
 :: //TODO: CT Precertificate SCTs: https://letsencrypt.org/2018/04/04/sct-encoding.html

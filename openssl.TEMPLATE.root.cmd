@@ -60,12 +60,12 @@ set PASSWORD_Root=root_key_pass
 :: Only countryName MUST be 2 chars, the rest can be 64 chars max
 :: few CA Root have a country name
 REM set countryName_Root=US
-set organizationName_Root=caCompany
+set organizationName_Root=CA
 :: Subject Organization Name Field: subject:organizationName (OID 2.5.4.10 )
 set organizationalUnitName_Root=YOURORG
 :: Subject Common Name Field: subject:commonName (OID:  2.5.4.3)
 :: Required/Optional:   Deprecated (Discouraged, but not prohibited)
-set commonName_Root=caCompany YOURORG Root
+set commonName_Root=CA YOURORG Root
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :: Intermediate policies: OIDs of public policies that apply to your Intermediate CA ---------
@@ -101,15 +101,15 @@ set policyIdentifier=1.3.6.1.5.5.7.2.1
 :: CPS Point to the Internet Security Research Group (ISRG) Certification Practice Statementer of the CA emiter
 :: that describes the policy under which the certificate in the subject was issued. 
 :: examples: http://cps.letsencrypt.org   http://certificates.godaddy.com/repository/   https://www.digicert.com/legal-repository
-set CPS.1=http://server1.yourcompany.com/cps/
+set CPS.1=http://server1.yourcompany.com/ssl/cps/
 
 :: User Notice is a small piece of text (RFC recommends to use no more than 200 characters) that describes particular policy.
 set explicitText=This certificate protects the private data transmitted throught the local domain YOURDOMAIN, own by yourCompany Inc.
 set organization=yourCompany Inc.
 
 :: X509v3 CRL Distribution Points:
-:: revocation url: you should serve ca.%ORG_Intermediate%.crl (DER) and ca.%ORG_Intermediate%.crl.crt (PEM) over http at this address:
-set crlDistributionPoints.1=http://server1.yourcompany.com/ca.%ORG_Intermediate%.crl
+:: revocation url: you should serve int.%ORG_Intermediate%.crl (DER) and int.%ORG_Intermediate%.crl.crt (PEM) over http at this address:
+set crlDistributionPoints.1=http://server1.yourcompany.com/int.%ORG_Intermediate%.crl
 
 :: //TODO: CT Precertificate SCTs: https://certificate.transparency.dev/howctworks/
 :: //TODO: CT Precertificate SCTs: https://letsencrypt.org/2018/04/04/sct-encoding.html
