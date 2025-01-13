@@ -1,19 +1,25 @@
-# ignore everything
-*
-# don't ignore directories so we can recurse them
-!*/
+# gitsync
+gitsync*
 
-# ignore specific folders or not
+# project
+/**/
+!/assets
+
 *.cfg_custom.cmd
 commit.*.txt
+/archive
 /backup
-/**/
 *.dll
 *.exe
 *.txt
 .rnd
 *.zip
 *.7z
+*.crt
+*.cer
+*.csp
+*.pem
+*.bak
 
 # ---> Windows
 # Windows thumbnail cache files

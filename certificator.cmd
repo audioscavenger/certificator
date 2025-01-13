@@ -2,6 +2,7 @@
 pushd %~dp0
 
 ::  1.7.x   TODO: default_days_Root != default_days_Intermediate but generated crt have same duration, why?
+::  1.8.0   fixed numerous errors in KU and EKU values for CA/Int/Server/Client
 ::  1.7.4   renamed all intermediate CA to int.*
 ::  1.7.3   bugfix
 ::  1.7.2   cleanup
@@ -74,7 +75,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DNSDOMAIN%
 
 
 :init
-set version=1.7.4
+set version=1.8.0
 set author=lderewonko
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
