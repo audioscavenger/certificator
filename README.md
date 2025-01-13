@@ -1,18 +1,27 @@
 # certificator
 
-- generate CA + Intermediate + wildcard DNSDOMAIN for servers
-- produces server PFX and clients PFX
-- generates unattended import PFX batches for server and client
+- generate CA + Subordinate + Server certificates chain using wildcard.USERDNSDOMAIN
+- outputs server PFX and clients PFX + unattended batch install with password inside
+- generates CRL structure to renew Sub and Server certs later on
 
 ## How To
-1. duplicate/rename YOURORG folder. YOURORG is the Root CA name
-2. rename and edit all 3 batches within YOURORG folder
-3. run CAgenerator.cmd (Optional: run as admin to be able to import the generated PFX)
+1. run certificator.cmd and answer the questions
+2. edit all 3 batches generated under YOURORG folder and YOURORG/USERDOMAIN subfolder
+3. run certificator.cmd again (Optional: run as admin to be able to import the generated PFX)
 4. optional: import the generated PFX by runing the generated batches *.chain.pfx.cmd
 
-- ca.DOMAIN.chain.pfx.cmd = Root+Intermediate to deploy on every desktop
-- DNSDOMAIN.chain.pfx.cmd = server+Root+Intermediate to deploy on servers ONLY
+PFX installers:
+- DNSDOMAIN/ca.DOMAIN.chain.pfx.cmd = Root+Subordinate chain to deploy on every desktop
+- DNSDOMAIN/DNSDOMAIN.chain.pfx.cmd = Root+Subordinate+Server chain to deploy on servers ONLY
 
 ## Requisites
 - powershell
-- openssl 1.1.1r (provided in \bin)
+- openssl (provided in /bin - get it [here](https://slproweb.com/products/Win32OpenSSL.html))
+  - works with OpenSSL 1.1.1x and 3.x
+
+## TODO
+- [ ] make it clear that our Int is actually a Subordinate, as it cannot generate Subordinate CAs
+- [ ] handle ECC hashes properly
+- [ ] generate OCSP cert
+- [ ] generate client cert
+

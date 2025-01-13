@@ -13,7 +13,7 @@ set ENCRYPTION=RSA
 :: this is your Root CA ORGanisation short name
 set ORG_Root=YOURORG
 :: this is your Intermediate ORGanisation short name and could be = to %USERDOMAIN%
-set ORG_Intermediate=YOURDOMAIN
+set ORG_Intermediate=USERDOMAIN
 
 :::::::::::::::::::::::::::::::::::::
 :: AIA (Authority Information Access): a certificate extension that contains information useful for verifying the trust status of a certificate. 
@@ -104,7 +104,7 @@ set policyIdentifier=1.3.6.1.5.5.7.2.1
 set CPS.1=http://server1.yourcompany.com/ssl/cps/
 
 :: User Notice is a small piece of text (RFC recommends to use no more than 200 characters) that describes particular policy.
-set explicitText=This certificate protects the private data transmitted throught the local domain YOURDOMAIN, own by yourCompany Inc.
+set explicitText=This certificate protects the private data transmitted throught the local domain USERDOMAIN, own by yourCompany Inc.
 set organization=yourCompany Inc.
 
 :: X509v3 CRL Distribution Points:

@@ -13,16 +13,16 @@ set ENCRYPTION=RSA
 :: this is your Root CA ORGanisation short name
 set ORG_Root=YOURORG
 :: this is your Intermediate ORGanisation short name and could be = to %USERDOMAIN%
-set ORG_Intermediate=YOURDOMAIN
+set ORG_Intermediate=USERDOMAIN
 :: this is your Server short name, used for filenames and could be = to %USERDNSDOMAIN%
-set DNSDOMAIN=YOURDOMAIN.LOCAL
+set DNSDOMAIN=USERDNSDOMAIN
 
 :: [alt_names] section, enter a list of domains to cover; there is no limit
 :: You can add short machine names, IP addresses, and wildcard domains
 :: Simply increment the DNS.{num} of the variable to add more domains
 :: Delete the lines you do not need starting from the bottom
 :: You cannot use IP ranges https://security.stackexchange.com/questions/91368/ip-range-in-ssl-subject-alternative-name
-set DNS.1=*.YOURDOMAIN.LOCAL
+set DNS.1=*.USERDNSDOMAIN
 set DNS.2=server1
 set DNS.3=server2
 set IP.1=10.0.0.11
@@ -79,10 +79,10 @@ set PASSWORD_PFX_Server=1234567890
 set countryName_Server=US
 set organizationName_Server=yourCompany Inc.
 :: Subject Organization Name Field: subject:organizationName (OID 2.5.4.10 )
-set organizationalUnitName_Server=YOURDOMAIN
+set organizationalUnitName_Server=USERDOMAIN
 :: Subject Common Name Field: subject:commonName (OID:  2.5.4.3)
 :: Required/Optional:   Required for a Server certificate
-set commonName_Server=*.YOURDOMAIN.LOCAL
+set commonName_Server=*.USERDNSDOMAIN
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: EV Browser part
 set stateOrProvinceName_Server=Arizona
 set localityName_Server=Phoenix
@@ -139,7 +139,7 @@ set policyIdentifier=1.3.6.1.5.5.7.2.1
 set CPS.1=http://server1.yourcompany.com/ssl/cps/
 
 :: User Notice is a small piece of text (RFC recommends to use no more than 200 characters) that describes particular policy.
-set explicitText=This certificate protects the private data transmitted throught the local domain YOURDOMAIN, own by yourCompany Inc.
+set explicitText=This certificate protects the private data transmitted throught the local domain USERDOMAIN, own by yourCompany Inc.
 set organization=yourCompany Inc.
 
 :: X509v3 CRL Distribution Points:
