@@ -16,7 +16,7 @@
 PFX installers:
 - DNSDOMAIN/ca.DOMAIN.chain.pfx.cmd = Root+Subordinate chain to deploy on every desktop
 - DNSDOMAIN/DNSDOMAIN.chain.pfx.cmd = Root+Subordinate+Server chain to deploy on servers ONLY
-![certificator-output.jpg](assets\certificator-output.jpg)
+![certificator-output.jpg](assets/certificator-output.jpg)
 
 ## Requisites
 - powershell
