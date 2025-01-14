@@ -2,6 +2,7 @@
 pushd %~dp0
 
 ::  1.7.x   TODO: default_days_Root != default_days_Intermediate but generated crt have same duration, why?
+::  1.8.2   updated README
 ::  1.8.1   bugfixes + updated wiki
 ::  1.8.0   fixed numerous errors in KU and EKU values for CA/Int/Server/Client
 ::  1.7.4   renamed all intermediate CA to int.*
@@ -76,8 +77,8 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DNSDOMAIN%
 
 
 :init
-set version=1.8.1
-set author=lderewonko
+set version=1.8.2
+set author=AudioscavengeR
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
 call :detect_windows_version
@@ -100,7 +101,7 @@ for %%x in (powershell.exe) do (set "powershell=%%~$PATH:x")
 IF NOT DEFINED powershell call :error %~0: powershell NOT FOUND
 
 where openssl >NUL 2>&1 || set "PATH=%~dp0bin;%PATH%"
-where openssl >NUL 2>&1 || call :error openssl not found under %~dp0bin
+where openssl >NUL 2>&1 || call :error openssl not found under %~dp0bin or anywhere else
 
 call :check_exist_exit openssl.TEMPLATE.root.cfg
 call :check_exist_exit openssl.TEMPLATE.root.cmd
