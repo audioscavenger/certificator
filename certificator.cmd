@@ -49,9 +49,9 @@ pushd %~dp0
 
 :: Certificate output breakdown: https://www.misterpki.com/openssl-view-certificate/
 REM openssl x509 -text -noout -in 
-REM openssl s_client -showcerts -connect https://www.nqzw.com
-REM openssl s_client -servername  www.nqzw.com -connect www.nqzw.com:443 | sed -ne "/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p" > www.nqzw.com.crt
-REM openssl x509 -text -noout -in www.nqzw.com.crt
+REM openssl s_client -showcerts -connect https://www.digicert.com
+REM openssl s_client -servername  www.digicert.com -connect www.digicert.com:443 | sed -ne "/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p" > www.digicert.com.crt
+REM openssl x509 -text -noout -in www.digicert.com.crt
 
 :: CANCEL:  2-step Ca + *.domain / separate CRT key     https://adfinis.com/en/blog/openssl-x509-certificates/
 :: DONE:    2-step Ca + *.domain / separate CA/CRT keys https://gist.github.com/Dan-Q/4c7108f1e539ee5aefbb53a334320b27
@@ -901,10 +901,10 @@ IF DEFINED VERBOSE type "%CAServer%.chain.pfx".cmd
 :: Question: How do I move a certificate from IIS / PFX (.p12 file) to a JKS (Java KeyStore)?
 REM %JDK_HOME%\bin\keytool -importkeystore -srckeystore PFX_P12_FILE_NAME -srcstoretype pkcs12 -srcstorepass PFX_P12_FILE -srcalias SOURCE_ALIAS -destkeystore KEYSTORE_FILE -deststoretype jks -deststorepass PASSWORD -destalias ALIAS_NAME
 :: Note: To find the srcalias, list the contents of the PFX/P12 file:
-REM %JDK_HOME%\bin\keytool -v -list -storetype pkcs12 -keystore \\sales-cc\cert\INTERNAL.NQSALES.COM.chain.pfx
+REM %JDK_HOME%\bin\keytool -v -list -storetype pkcs12 -keystore \\sales-cc\cert\INTERNAL.USERDNSDOMAIN.chain.pfx
 
 :: delete them:
-REM powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My -Recurse ^| Get-ChildItem ^| where {$_.FriendlyName -like '*.INTERNAL.NQSALES.COM'} ^| Remove-Item
+REM powershell -executionPolicy bypass -Command Get-ChildItem -path Cert:\LocalMachine\My -Recurse ^| Get-ChildItem ^| where {$_.FriendlyName -like '*.INTERNAL.USERDNSDOMAIN'} ^| Remove-Item
 
 goto :EOF
 
