@@ -51,8 +51,8 @@ set default_md_Root=sha256
 
 "Experts" constantly predict the end of 1024bit encryption but, as of 2022 the 256bit still has not been breached, let alone 512 or 1024. Using 2048 bits over 1024, your security is improved 2^1024 times. 4096 should only be used for the Root CA if at all.
 * NIST basically recommend using sha256 + RSA 3072 at a minimum, until 2031.
+* Seagate conducted a thourough analysis of [128-Bit Versus 256-Bit AES Encryption](http://www.dator8.info/pdf/AES/3.pdf) proving that breaking a 128 bits security (RSA 3072) would take roughly 77,000,000,000,000,000,000,000,000 years. Breaking 88 bits (RSA 1024) seems to be possible for the low cost of $300 Millions, which is not proven anyways.
 * [Comparison of bit size vs effectiveness for RSA vs ECC](https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption) and [NIST.SP.800-57pt1r5](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf):
-
 
 | Security Strength | RSA | ECC |
 | --- | --- | --- |
