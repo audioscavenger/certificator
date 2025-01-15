@@ -46,9 +46,11 @@ set default_days_Server=3650
 REM set default_md_Server=sha512
 set default_md_Server=sha256
 
+:: NIST latest: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf
+:: NIST basically recommend using sha256 + RSA 3072 at a minimum, until 2031.
 :: Expert constantly predict the end of 1024bit encryption but, as of 2022 the 256bit still has not been breached, let alone 512 or 1024.
 :: Using 2048 bits over 1024, your security is improved 2^1024 times. 4096 should only be used for the Root CA.
-:: Comparison of bit size vs effectiveness for RSA vs ECC: https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption
+:: [Comparison of bit size vs effectiveness for RSA vs ECC](https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption) and [NIST.SP.800-57pt1r5](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf):
 ::    RSA     ECC
 ::    1024    160
 ::    2048    224
@@ -62,6 +64,7 @@ set default_bits_Server=2048
 :: If you use any other curve, then some widespread Web browsers (e.g. Internet Explorer, Firefox...) will be unable to talk to your server.
 :: => FYI www.google.com uses secp384r1; if your browser cannot access google, consider upgrading.
 :: secp384r1 (ASN1 OID) == P-384 (NIST CURVE) = NIST/SECG curve over a 384 bit prime field
+:: NIST latest: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf
 ::      NIST-P: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
 ::      SECG  : https://www.secg.org/sec2-v2.pdf
 :: prime256v1                               = X9.62/SECG curve over a 256 bit prime field

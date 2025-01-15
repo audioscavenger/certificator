@@ -26,8 +26,8 @@ REM set authorityInfoAccessCaIssuers=yourcompany.com/ca.%ORG_Root%.crt
 set authorityInfoAccessOCSP=server1.yourcompany.com/ssl/ocsp/
 :::::::::::::::::::::::::::::::::::::
 
-:: 3650 = 10 years
-set default_days_Intermediate=3650
+:: 7300 = 20 years
+set default_days_Intermediate=7300
 
 :: From a security perspective, sha512 is overkill: In practical terms, SHA-256 is just as secure as SHA-384 or SHA-512. 
 :: We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
@@ -36,14 +36,17 @@ set default_days_Intermediate=3650
 REM set default_md_Intermediate=sha512
 set default_md_Intermediate=sha256
 
+:: NIST latest: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf
+:: NIST basically recommend using sha256 + RSA 3072 at a minimum, until 2031.
 :: Expert constantly predict the end of 1024bit encryption but, as of 2022 the 256bit still has not been breached, let alone 512 or 1024.
 :: Using 2048 bits over 1024, your security is improved 2^1024 times. 4096 should only be used for the Root CA.
-:: Comparison of bit size vs effectiveness for RSA vs ECC: https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption
+:: [Comparison of bit size vs effectiveness for RSA vs ECC](https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption) and [NIST.SP.800-57pt1r5](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf):
 ::    RSA     ECC
 ::    1024    160
 ::    2048    224
 ::    3072    256
 ::    7680    384
+:: Finally, [Microsoft deprecated 1024 bits in 2024](https://www.bleepingcomputer.com/news/microsoft/microsoft-announces-deprecation-of-1024-bit-rsa-keys-in-windows/) so 2048 is not the minimum.
 set default_bits_Intermediate=2048
 
 :: https://crypto.stackexchange.com/questions/70889/is-curve-p-384-equal-to-secp384r1?newreg=a86ae3c6cbfd427e94e0a8682450c2cf
@@ -52,6 +55,7 @@ set default_bits_Intermediate=2048
 :: If you use any other curve, then some widespread Web browsers (e.g. Internet Explorer, Firefox...) will be unable to talk to your server.
 :: => FYI www.google.com uses secp384r1; if your browser cannot access google, consider upgrading.
 :: secp384r1 (ASN1 OID) == P-384 (NIST CURVE) = NIST/SECG curve over a 384 bit prime field
+:: NIST latest: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf
 ::      NIST-P: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
 ::      SECG  : https://www.secg.org/sec2-v2.pdf
 :: prime256v1                               = X9.62/SECG curve over a 256 bit prime field

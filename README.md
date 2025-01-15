@@ -35,9 +35,9 @@ set ORG_Root=YOURORG
 set ORG_Intermediate=USERDOMAIN
 ```
 
-109500 = 30 years
+10950 = 30 years
 ```
-set default_days_Root=109500
+set default_days_Root=10950
 ```
 
 From a security perspective, sha512 is overkill: In practical terms, SHA-256 is just as secure as SHA-384 or SHA-512. We can't produce collisions in any of them with current or foreseeable technology, so the security you get is identical. 
@@ -50,14 +50,26 @@ set default_md_Root=sha256
 ```
 
 "Experts" constantly predict the end of 1024bit encryption but, as of 2022 the 256bit still has not been breached, let alone 512 or 1024. Using 2048 bits over 1024, your security is improved 2^1024 times. 4096 should only be used for the Root CA if at all.
-* [Comparison of bit size vs effectiveness for RSA vs ECC](https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption)
+* NIST basically recommend using sha256 + RSA 3072 at a minimum, until 2031.
+* [Comparison of bit size vs effectiveness for RSA vs ECC](https://sectigo.com/resource-library/rsa-vs-dsa-vs-ecc-encryption) and [NIST.SP.800-57pt1r5](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf):
 
-| RSA | ECC |
-| --- | --- |
-| 1024 | 160 |
-| 2048 | 224 |
-| 3072 | 256 |
-| 7680 | 384 |
+
+| Security Strength | RSA | ECC |
+| --- | --- | --- |
+| ≤ 80 | 1024 | 160 |
+| 112 | 2048 | 224 |
+| 128 | 3072 | 256 |
+| 192 | 7680 | 384 |
+| 256 | 15360 | 512 |
+
+* This fact does not discourage stupid security experts in charge from forcing you to use 2048 bits RSA: [Soon to be Deprecated – Are you still using RSA 1024 Bit Keys for Windows?](https://www.encryptionconsulting.com/soon-to-be-deprecated-are-you-still-using-rsa-1024-bit-keys-for-windows/)
+* This fact does not discourage stupid security experts in charge from anouncing [the end of RSA and ECDSA](https://fullcirclesecurity.org/2024/11/26/nist-announces-the-end-of-rsa-and-ecdsa/) by 2030.
+* These "experts" do not even agree with each other as we can read on [this stupid German blog](https://quantumzeitgeist.com/nist-proposes-retirement-of-outdated-encryption-algorithms/) that NIST recommends the use of more robust digital signature algorithms, such as ECDSA. Wrong.
+  * Actually, it is reported by [NIST.IR.8547](https://nvlpubs.nist.gov/nistpubs/ir/2024/NIST.IR.8547.ipd.pdf) that ECDSA is indeed deprecated by 2035. Because... of Quantum computers.
+  * **Quantum computers threat is a vaporware**. They do not exist as of 2025 and will likely not exist within the next 30 years. Who wants to bet?
+  * [Chinese propaganda claim their Quantum computer broke a 50 bits RSA key](https://www.livescience.com/technology/computing/chinese-scientists-claim-they-broke-rsa-encryption-with-a-quantum-computer-but-theres-a-catch)... This is so false and unproven, but justifies we all switch to 2048 bits, right? Even [RSA.com call BS on that claim](https://www.rsa.com/resources/blog/zero-trust/setting-the-record-straight-on-quantum-computing-and-rsa-encryption/).
+  * Others agree with me, that [Quantum computers are not a threat to RSA](https://arstechnica.com/information-technology/2023/01/fear-not-rsa-encryption-wont-fall-to-quantum-computing-anytime-soon/) at all. Who to believe?
+
 ```
 set default_bits_Root=4096
 ```
