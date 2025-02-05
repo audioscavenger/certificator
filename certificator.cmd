@@ -2,6 +2,8 @@
 pushd %~dp0
 
 ::  1.7.x   TODO: default_days_Root != default_days_Intermediate but generated crt have same duration, why?
+::  1.8.4   removed CRL server address
+::  1.8.3   fixed crlDistributionPoints: do not add http:// !
 ::  1.8.2   updated README
 ::  1.8.1   bugfixes + updated wiki
 ::  1.8.0   fixed numerous errors in KU and EKU values for CA/Int/Server/Client
@@ -77,7 +79,7 @@ REM set CAServer=%ORG_Root%\%ORG_Intermediate%\%DNSDOMAIN%
 
 
 :init
-set version=1.8.2
+set version=1.8.4
 set author=AudioscavengeR
 title %~n0 %version% - %USERDOMAIN%\%USERNAME%@%USERDNSDOMAIN% - %COMPUTERNAME%.%USERDNSDOMAIN%
 
@@ -706,7 +708,7 @@ IF DEFINED VERBOSE echo %c%certutil -verify -urlfetch "%CAIntermediate%.crt" %EN
 certutil -verify -urlfetch "%CAIntermediate%.crt"
 
 :: a Windows Server 2003 CA will always check revocation on all certificates in the PKI hierarchy (except the root CA certificate) before issuing an end-entity certificate. However in this situation, a valid Certificate Revocation List (CRL) for one or more of the intermediate certification authority (CA) certificates was not be found since the root CA was offline. This issue may occur if the CRL is not available to the certificate server, or if the CRL has expired.
-:: You may disabled the feature that checks revocation on all certificates in the PKI hierarchy with the following command on the CA:
+:: You may disable the feature that checks revocation on all certificates in the PKI hierarchy with the following command on the CA:
 
 REM certutil –setreg ca\CRLFlags +CRLF_REVCHECK_IGNORE_OFFLINE
 goto :EOF
