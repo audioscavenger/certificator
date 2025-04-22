@@ -1,3 +1,28 @@
+REM TODO: add policies
+
+REM server:
+REM Certificate Type ( 2.23.140.1.2.2 )
+REM Organization Validation
+
+REM int:
+REM ANSI Organizational Identifier ( 2.16.840 )
+REM 2.16.840.1.114412.2.1
+
+REM Certificate Type ( 2.23.140.1.1 )
+REM Extended Validation
+
+REM Certificate Type ( 2.23.140.1.2.1 )
+REM Domain Validation
+
+REM Certificate Type ( 2.23.140.1.2.2 )
+REM Organization Validation
+
+REM Certificate Type ( 2.23.140.1.2.3 )
+REM Individual Validation
+
+pause
+
+
 @echo OFF
 pushd %~dp0
 
